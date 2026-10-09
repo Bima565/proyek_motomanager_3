@@ -12,6 +12,32 @@
 .swiftpm/
 migrate_working_dir/
 
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Firebase & Secret Keys / Credentials
+*firebase-adminsdk*.json
+*service-account*.json
+*.env
+.env*
+key.properties
+**/*.keystore
+**/*.jks
+
+# Database & export dumps
+db_*.json
+
+# Android Studio & Gradle
+.gradle/
+android/.gradle/
+/android/build/
+android/local.properties
+android/gradle_*.txt
+gradle_*.txt
+
 # IntelliJ related
 *.iml
 *.ipr
