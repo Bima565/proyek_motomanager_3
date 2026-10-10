@@ -1,10 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../components/create_password_dialog.dart';
+import '../components/password_forget.dart';
 import '../hooks/firebase_auth.dart';
 import 'dasboard.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final String? initialEmail;
+  const LoginPage({super.key, this.initialEmail});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -12,10 +15,8 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _emailController =
-      TextEditingController(text: 'sugeng@gmail.com');
-  final TextEditingController _passwordController =
-      TextEditingController(text: 'password123');
+  late final TextEditingController _emailController;
+  final TextEditingController _passwordController = TextEditingController();
 
   final AuthService _authService = AuthService();
 
@@ -30,6 +31,14 @@ class _LoginPageState extends State<LoginPage> {
   static const Color textWhite = Color(0xFFFFFFFF);
   static const Color textMuted = Color(0xFF8E95A2);
   static const Color textDim = Color(0xFF6B7280);
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(
+      text: widget.initialEmail ?? 'sugeng@gmail.com',
+    );
+  }
 
   @override
   void dispose() {
@@ -156,6 +165,28 @@ class _LoginPageState extends State<LoginPage> {
       if (userData != null) {
         final nama = userData['nama_lengkap'] ?? 'Pengguna';
         final role = userData['role'] ?? 'Kasir';
+        final email = userData['email'] ?? '';
+
+        // Cek apakah akun Google ini sudah memiliki password native
+        final hasPassword = await _authService.userHasPassword();
+
+        if (!hasPassword && mounted) {
+          // Minta pengguna membuat password baru dengan aturan validasi
+          final created = await CreatePasswordDialog.show(
+            context,
+            email: email,
+            isChangePassword: false,
+          );
+
+          if (created != true) {
+            // Batal buat password -> batalkan login
+            await _authService.signOut();
+            return;
+          }
+          userData['has_password'] = true;
+        }
+
+        if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -429,16 +460,25 @@ class _LoginPageState extends State<LoginPage> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: GestureDetector(
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              backgroundColor: inputBg,
-                              content: Text(
-                                'Hubungi Administrator Bengkel untuk mereset kata sandi Anda.',
-                                style: TextStyle(color: textWhite),
-                              ),
-                            ),
+                        onTap: () async {
+                          final resetEmail = await PasswordForgetDialog.show(
+                            context,
+                            initialEmail: _emailController.text,
                           );
+                          if (!mounted) return;
+                          if (resetEmail != null) {
+                            _emailController.text = resetEmail;
+                            _passwordController.clear();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                backgroundColor: Color(0xFF143322),
+                                behavior: SnackBarBehavior.floating,
+                                content: Text(
+                                  'Password berhasil diperbarui! Silakan masuk dengan password baru Anda.',
+                                ),
+                              ),
+                            );
+                          }
                         },
                         child: const Padding(
                           padding: EdgeInsets.symmetric(vertical: 4.0),

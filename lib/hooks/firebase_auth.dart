@@ -32,17 +32,30 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    // Autentikasi dengan Firebase Auth
-    final UserCredential credential = await _auth.signInWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
+    final cleanEmail = email.trim();
 
-    final User? user = credential.user;
-    if (user == null) return null;
+    try {
+      // 1. Coba login melalui Firebase Auth
+      final UserCredential credential =
+          await _auth.signInWithEmailAndPassword(
+        email: cleanEmail,
+        password: password,
+      );
 
-    // Ambil data profil & role pengguna dari koleksi 'user' di Firestore
-    return await getUserProfileByEmail(user.email ?? email.trim());
+      final User? user = credential.user;
+      if (user == null) return null;
+
+      return await getUserProfileByEmail(user.email ?? cleanEmail);
+    } on FirebaseAuthException catch (_) {
+      // 2. Fallback: Cek kecocokan password di Firestore koleksi 'user'
+      final profile = await getUserProfileByEmail(cleanEmail);
+      if (profile != null &&
+          profile['password'] != null &&
+          profile['password'] == password) {
+        return profile;
+      }
+      rethrow;
+    }
   }
 
   /// 2. LOGIN / REGISTER MENGGUNAKAN GOOGLE
@@ -154,7 +167,81 @@ class AuthService {
     return null;
   }
 
-  /// 4. LOGOUT
+  /// Cek apakah akun saat ini sudah memiliki password
+  Future<bool> userHasPassword() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+
+    // Cek apakah provider 'password' sudah terdaftar di Firebase Auth
+    final hasProvider =
+        user.providerData.any((p) => p.providerId == 'password');
+    if (hasProvider) return true;
+
+    // Cek juga di dokumen Firestore
+    final profile = await getUserProfileByEmail(user.email ?? '');
+    return profile?['has_password'] == true;
+  }
+
+  /// 4. SET / UPDATE PASSWORD UNTUK AKUN LOGIN GOOGLE
+  Future<void> setAccountPassword(String newPassword) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) {
+      throw Exception('Pengguna tidak sedang login');
+    }
+
+    // 1. Daftarkan / perbarui password di Firebase Auth
+    final hasProvider =
+        user.providerData.any((p) => p.providerId == 'password');
+
+    if (hasProvider) {
+      await user.updatePassword(newPassword);
+    } else {
+      try {
+        final credential = EmailAuthProvider.credential(
+          email: user.email!,
+          password: newPassword,
+        );
+        await user.linkWithCredential(credential);
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'provider-already-linked' ||
+            e.code == 'credential-already-in-use') {
+          await user.updatePassword(newPassword);
+        } else {
+          // Fallback update password langsung
+          await user.updatePassword(newPassword);
+        }
+      }
+    }
+
+    // 2. Simpan status & password ke Firestore
+    final querySnapshot = await _firestore
+        .collection('user')
+        .where('email', isEqualTo: user.email)
+        .limit(1)
+        .get();
+
+    if (querySnapshot.docs.isNotEmpty) {
+      await querySnapshot.docs.first.reference.update({
+        'has_password': true,
+        'password': newPassword,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+    } else {
+      await _firestore.collection('user').doc(user.uid).set({
+        'nama_lengkap': user.displayName ?? 'Pengguna Google',
+        'email': user.email,
+        'no_telepon': user.phoneNumber ?? '',
+        'role': 'Kasir',
+        'status': true,
+        'has_password': true,
+        'password': newPassword,
+        'created_at': FieldValue.serverTimestamp(),
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+  }
+
+  /// 5. LOGOUT
   Future<void> signOut() async {
     try {
       await _googleSignIn.signOut();
