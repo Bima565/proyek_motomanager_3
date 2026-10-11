@@ -153,8 +153,9 @@ class _PasswordForgetDialogState extends State<PasswordForgetDialog> {
             Timestamp.fromDate(DateTime.now().add(const Duration(minutes: 15))),
       });
 
-      // 4. Kirim email via EmailService (Resend API langsung kirim kode ke inbox)
-      await EmailService.sendOtpCode(targetEmail: email, otpCode: code);
+      // 4. Kirim email via EmailService
+      final sendResult =
+          await EmailService.sendOtpCode(targetEmail: email, otpCode: code);
 
       // Catat juga ke antrean 'mail' Firestore jika ekstensi Firebase aktif
       try {
@@ -176,13 +177,17 @@ class _PasswordForgetDialogState extends State<PasswordForgetDialog> {
           _codeController.clear();
         });
 
-        // Notifikasi popup info (termasuk kode untuk kemudahan testing)
+        // Notifikasi status pengiriman
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: const Color(0xFF143322),
+            backgroundColor: sendResult.success
+                ? const Color(0xFF143322)
+                : const Color(0xFF3B1517),
             duration: const Duration(seconds: 8),
             content: Text(
-              'Kode 5-digit telah dikirim ke $email\n(Kode demo testing: $code)',
+              sendResult.success
+                  ? 'Kode 5-digit terkirim ke $email! Cek inbox/spam.'
+                  : 'Gagal kirim: ${sendResult.message}\n(Kode testing: $code)',
               style: const TextStyle(color: textWhite),
             ),
           ),
