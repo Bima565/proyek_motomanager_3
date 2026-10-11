@@ -1,17 +1,19 @@
-# proyek_motomanager_3
+# MotoManage
 
-A new Flutter project.
+A mobile-based motorcycle management application designed to facilitate vehicle tracking, user management, and workshop service operations.
 
-## Getting Started
+## Description
 
-This project is a starting point for a Flutter application.
+MotoManage provides a motorcycle record and management system with integrated account authentication. The application supports user registration, native password creation, and account recovery via email OTP verification.
 
-A few resources to get you started if this is your first Flutter project:
+## Tools and Technologies
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+- **Flutter**: Cross-platform mobile UI framework.
+- **Dart**: Programming language used for development.
+- **Material 3**: Design system for the user interface.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## APIs and Services
+
+- **Firebase Authentication**: User authentication service (Email/Password and Google Sign-In).
+- **Cloud Firestore**: Cloud NoSQL database for real-time data storage.
+- **Brevo REST API**: Email delivery service for OTP verification codes and password resets.
