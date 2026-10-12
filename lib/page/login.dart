@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../components/create_password_dialog.dart';
 import '../components/password_forget.dart';
 import '../hooks/firebase_auth.dart';
-import 'dasboard.dart';
+import 'beranda.dart';
 
 class LoginPage extends StatefulWidget {
   final String? initialEmail;
@@ -88,11 +88,11 @@ class _LoginPageState extends State<LoginPage> {
           ),
         );
 
-        // Pindah ke halaman Dashboard Test
+        // Pindah ke halaman Beranda (FR02)
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => DasboardPage(userData: userData),
+            builder: (context) => BerandaPage(userData: userData),
           ),
         );
       } on FirebaseAuthException catch (e) {
@@ -214,11 +214,11 @@ class _LoginPageState extends State<LoginPage> {
           ),
         );
 
-        // Pindah ke halaman Dashboard Test
+        // Pindah ke halaman Beranda (FR02)
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => DasboardPage(userData: userData),
+            builder: (context) => BerandaPage(userData: userData),
           ),
         );
       }
