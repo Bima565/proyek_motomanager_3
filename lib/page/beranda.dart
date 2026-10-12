@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../hooks/firebase_auth.dart';
 import 'profil.dart';
+import 'sparepart.dart';
 
 class BerandaPage extends StatefulWidget {
   final Map<String, dynamic>? userData;
@@ -321,7 +322,12 @@ class _BerandaPageState extends State<BerandaPage> {
             ),
             GestureDetector(
               onTap: () {
-                setState(() => _currentNavIndex = 2);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SparepartPage(),
+                  ),
+                );
               },
               child: const Text(
                 'Semua (4) >',
@@ -561,6 +567,14 @@ class _BerandaPageState extends State<BerandaPage> {
             icon: Icons.inventory_2_outlined,
             label: 'Stok',
             isActive: _currentNavIndex == 2,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SparepartPage(),
+                ),
+              );
+            },
           ),
           // 4. Laporan
           _buildNavItem(

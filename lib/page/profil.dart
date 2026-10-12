@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../components/create_password_dialog.dart';
 import '../hooks/firebase_auth.dart';
 import 'login.dart';
+import 'sparepart.dart';
 
 class ProfilPage extends StatefulWidget {
   final Map<String, dynamic>? userData;
@@ -736,6 +737,14 @@ class _ProfilPageState extends State<ProfilPage> {
             icon: Icons.inventory_2_outlined,
             label: 'Stok',
             isActive: false,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SparepartPage(),
+                ),
+              );
+            },
           ),
           // 4. Laporan
           _buildNavItem(
