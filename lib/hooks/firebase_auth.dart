@@ -34,28 +34,17 @@ class AuthService {
   }) async {
     final cleanEmail = email.trim();
 
-    try {
-      // 1. Coba login melalui Firebase Auth
-      final UserCredential credential =
-          await _auth.signInWithEmailAndPassword(
-        email: cleanEmail,
-        password: password,
-      );
+    // Login via Firebase Auth (aman & ter-hash di server Google)
+    final UserCredential credential =
+        await _auth.signInWithEmailAndPassword(
+      email: cleanEmail,
+      password: password,
+    );
 
-      final User? user = credential.user;
-      if (user == null) return null;
+    final User? user = credential.user;
+    if (user == null) return null;
 
-      return await getUserProfileByEmail(user.email ?? cleanEmail);
-    } on FirebaseAuthException catch (_) {
-      // 2. Fallback: Cek kecocokan password di Firestore koleksi 'user'
-      final profile = await getUserProfileByEmail(cleanEmail);
-      if (profile != null &&
-          profile['password'] != null &&
-          profile['password'] == password) {
-        return profile;
-      }
-      rethrow;
-    }
+    return await getUserProfileByEmail(user.email ?? cleanEmail);
   }
 
   /// 2. LOGIN / REGISTER MENGGUNAKAN GOOGLE
@@ -213,7 +202,7 @@ class AuthService {
       }
     }
 
-    // 2. Simpan status & password ke Firestore
+    // 2. Simpan status bahwa user sudah punya password ke Firestore (tanpa menyimpan plaintext password)
     final querySnapshot = await _firestore
         .collection('user')
         .where('email', isEqualTo: user.email)
@@ -223,7 +212,6 @@ class AuthService {
     if (querySnapshot.docs.isNotEmpty) {
       await querySnapshot.docs.first.reference.update({
         'has_password': true,
-        'password': newPassword,
         'updated_at': FieldValue.serverTimestamp(),
       });
     } else {
@@ -234,7 +222,6 @@ class AuthService {
         'role': 'Kasir',
         'status': true,
         'has_password': true,
-        'password': newPassword,
         'created_at': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));

@@ -285,9 +285,8 @@ class _PasswordForgetDialogState extends State<PasswordForgetDialog> {
 
     try {
       final email = _emailController.text.trim();
-      final newPassword = _passwordController.text.trim();
 
-      // 1. Update password di Firestore koleksi 'user'
+      // 1. Update status di Firestore koleksi 'user'
       final querySnapshot = await _firestore
           .collection('user')
           .where('email', isEqualTo: email)
@@ -296,7 +295,6 @@ class _PasswordForgetDialogState extends State<PasswordForgetDialog> {
 
       if (querySnapshot.docs.isNotEmpty) {
         await querySnapshot.docs.first.reference.update({
-          'password': newPassword,
           'has_password': true,
           'updated_at': FieldValue.serverTimestamp(),
         });
