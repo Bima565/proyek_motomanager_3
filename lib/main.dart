@@ -7,6 +7,9 @@ import 'page/login.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Load konfigurasi API key dari .env atau compile-time environment
+  await DefaultFirebaseOptions.loadEnv();
+
   // Inisialisasi Firebase dengan konfigurasi multi-platform (Android, Web, dll.)
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,

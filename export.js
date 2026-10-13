@@ -85,7 +85,7 @@ async function exportAllData() {
     console.log(`✓ Koleksi '${colName}' berhasil diunduh (${data.length} dokumen)`);
   }
 
-  const outputFile = path.join(__dirname, 'database_output.json');
+  const outputFile = path.join(__dirname, 'db_kelompok_3.json');
   fs.writeFileSync(outputFile, JSON.stringify(result, null, 2), 'utf-8');
 
   console.log('==================================================');
