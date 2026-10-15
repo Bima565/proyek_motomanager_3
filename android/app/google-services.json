@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "596413030925-kuiloveq1eqotgjcmp5qaqmjj3t2rmr1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.proyek_motomanager_3",
+            "certificate_hash": "27e2e71198d7c76f34561bfe1dd60a3d498a39f2"
+          }
+        },
+        {
+          "client_id": "596413030925-umjlt1f51vgikdn0fd9dl359dbo80p47.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.proyek_motomanager_3",
+            "certificate_hash": "9a4adfdc8d4e8b70b93c0107fd88735858ffef68"
+          }
+        },
+        {
           "client_id": "596413030925-2g8q20qtp7r15i3p0qvokec2rorfi6su.apps.googleusercontent.com",
           "client_type": 3
         }

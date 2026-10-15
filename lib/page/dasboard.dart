@@ -30,20 +30,6 @@ class _DasboardPageState extends State<DasboardPage> {
         _hasPassword = hasPass;
         _isCheckingPassword = false;
       });
-
-      // Jika belum memiliki password native, otomatis tampilkan dialog buat password
-      if (!hasPass) {
-        final email = widget.userData?['email'] ??
-            _authService.currentUser?.email ??
-            '';
-        if (email.isNotEmpty) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              _handleChangePassword(email);
-            }
-          });
-        }
-      }
     }
   }
 

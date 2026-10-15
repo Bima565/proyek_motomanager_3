@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../components/create_password_dialog.dart';
 import '../hooks/firebase_auth.dart';
+import 'dasboard.dart';
 import 'login.dart';
 import 'sparepart.dart';
 
@@ -361,6 +362,19 @@ class _ProfilPageState extends State<ProfilPage> {
               _buildActionMenuItem(
                 title: 'Ganti Kata Sandi (Password)',
                 onTap: () => _handleChangePassword(email),
+              ),
+              const SizedBox(height: 10),
+              _buildActionMenuItem(
+                title: 'Status Keamanan & Akun (Dashboard)',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          DasboardPage(userData: widget.userData),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 24),
 

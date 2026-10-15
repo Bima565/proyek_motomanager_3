@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../components/create_password_dialog.dart';
 import '../components/password_forget.dart';
 import '../hooks/firebase_auth.dart';
 import 'beranda.dart';
@@ -165,28 +164,6 @@ class _LoginPageState extends State<LoginPage> {
       if (userData != null) {
         final nama = userData['nama_lengkap'] ?? 'Pengguna';
         final role = userData['role'] ?? 'Kasir';
-        final email = userData['email'] ?? '';
-
-        // Cek apakah akun Google ini sudah memiliki password native
-        final hasPassword = await _authService.userHasPassword();
-
-        if (!hasPassword && mounted) {
-          // Minta pengguna membuat password baru dengan aturan validasi
-          final created = await CreatePasswordDialog.show(
-            context,
-            email: email,
-            isChangePassword: false,
-          );
-
-          if (created != true) {
-            // Batal buat password -> batalkan login
-            await _authService.signOut();
-            return;
-          }
-          userData['has_password'] = true;
-        }
-
-        if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -214,7 +191,7 @@ class _LoginPageState extends State<LoginPage> {
           ),
         );
 
-        // Pindah ke halaman Beranda (FR02)
+        // Pindah langsung ke halaman Beranda / Dashboard (FR02)
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -222,7 +199,11 @@ class _LoginPageState extends State<LoginPage> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('==== ERROR GOOGLE LOGIN ====');
+      debugPrint('Error: $e');
+      debugPrint('Stack: $stack');
+      debugPrint('===========================');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

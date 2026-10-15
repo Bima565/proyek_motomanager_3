@@ -1,24 +1,30 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
-  bool _isGoogleSignInInitialized = false;
+  static bool _isGoogleSignInInitialized = false;
+  static Future<void>? _initFuture;
 
   // Web Client ID dari Google Cloud / Firebase Console
   static const String serverClientId =
       '596413030925-2g8q20qtp7r15i3p0qvokec2rorfi6su.apps.googleusercontent.com';
 
   Future<void> _ensureGoogleSignInInitialized() async {
-    if (!_isGoogleSignInInitialized) {
-      await _googleSignIn.initialize(
-        serverClientId: serverClientId,
-      );
-      _isGoogleSignInInitialized = true;
+    if (_isGoogleSignInInitialized) return;
+    if (_initFuture != null) {
+      await _initFuture;
+      return;
     }
+    _initFuture = _googleSignIn.initialize(
+      serverClientId: serverClientId,
+    );
+    await _initFuture;
+    _isGoogleSignInInitialized = true;
   }
 
   // User Firebase Auth yang sedang login
@@ -56,8 +62,17 @@ class AuthService {
       final GoogleSignInAccount account = await _googleSignIn.authenticate();
       final GoogleSignInAuthentication auth = account.authentication;
 
+      // Ambil accessToken jika tersedia sebagai fallback/pelengkap
+      String? accessToken;
+      try {
+        final authClient = await account.authorizationClient
+            .authorizationForScopes(['email', 'profile']);
+        accessToken = authClient?.accessToken;
+      } catch (_) {}
+
       final OAuthCredential credential = GoogleAuthProvider.credential(
         idToken: auth.idToken,
+        accessToken: accessToken,
       );
 
       // Masuk ke Firebase Auth menggunakan kredensial Google
@@ -67,41 +82,72 @@ class AuthService {
 
       if (user == null) return null;
 
-      // Cek apakah akun email ini sudah terdaftar di koleksi 'user' Firestore
-      final querySnapshot = await _firestore
-          .collection('user')
-          .where('email', isEqualTo: user.email)
-          .limit(1)
-          .get();
+      try {
+        // 1. Cek langsung dengan UID Firebase Auth
+        final userDoc =
+            await _firestore.collection('user').doc(user.uid).get();
+        if (userDoc.exists && userDoc.data() != null) {
+          final data = userDoc.data()!;
+          data['id'] = userDoc.id;
+          return data;
+        }
 
-      if (querySnapshot.docs.isNotEmpty) {
-        // User sudah terdaftar sebelumnya di database Firestore
-        final existingDoc = querySnapshot.docs.first;
-        final data = existingDoc.data();
-        data['id'] = existingDoc.id;
-        return data;
-      } else {
-        // Pengguna baru pertama kali login Google -> Daftarkan otomatis ke Firestore
-        final newUserData = <String, dynamic>{
+        // 2. Cek apakah akun email ini sudah terdaftar di koleksi 'user' Firestore
+        final querySnapshot = await _firestore
+            .collection('user')
+            .where('email', isEqualTo: user.email)
+            .limit(1)
+            .get();
+
+        if (querySnapshot.docs.isNotEmpty) {
+          // User sudah terdaftar sebelumnya di database Firestore
+          final existingDoc = querySnapshot.docs.first;
+          final data = existingDoc.data();
+          data['id'] = existingDoc.id;
+          return data;
+        } else {
+          // Pengguna baru pertama kali login Google -> Daftarkan otomatis ke Firestore
+          final newUserData = <String, dynamic>{
+            'nama_lengkap': user.displayName ?? 'Pengguna Google',
+            'email': user.email ?? '',
+            'no_telepon': user.phoneNumber ?? '',
+            'role': 'Kasir', // Role default untuk user baru
+            'status': true,
+            'created_at': FieldValue.serverTimestamp(),
+            'updated_at': FieldValue.serverTimestamp(),
+          };
+
+          // Simpan dokumen baru dengan UID Firebase Auth sebagai document ID
+          await _firestore.collection('user').doc(user.uid).set(newUserData);
+          newUserData['id'] = user.uid;
+          return newUserData;
+        }
+      } catch (firestoreError) {
+        // Fallback jika Firestore terkendala, tetap izinkan login ke dashboard
+        return <String, dynamic>{
+          'id': user.uid,
           'nama_lengkap': user.displayName ?? 'Pengguna Google',
           'email': user.email ?? '',
           'no_telepon': user.phoneNumber ?? '',
-          'role': 'Kasir', // Role default untuk user baru
+          'role': 'Kasir',
           'status': true,
-          'created_at': FieldValue.serverTimestamp(),
-          'updated_at': FieldValue.serverTimestamp(),
         };
-
-        // Simpan dokumen baru dengan UID Firebase Auth sebagai document ID
-        await _firestore.collection('user').doc(user.uid).set(newUserData);
-        newUserData['id'] = user.uid;
-        return newUserData;
       }
     } on GoogleSignInException catch (e) {
-      if (e.code == GoogleSignInExceptionCode.canceled) {
+      if (e.code == GoogleSignInExceptionCode.canceled ||
+          e.code == GoogleSignInExceptionCode.interrupted) {
         // Dibatalkan oleh pengguna
         return null;
       }
+      debugPrint('GoogleSignInException [${e.code}]: ${e.description}');
+      rethrow;
+    } catch (e) {
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('canceled') || errStr.contains('cancelled')) {
+        // Dibatalkan oleh pengguna
+        return null;
+      }
+      debugPrint('AuthService.signInWithGoogle error: $e');
       rethrow;
     }
   }
