@@ -15,6 +15,7 @@ class BerandaPage extends StatefulWidget {
 class _BerandaPageState extends State<BerandaPage> {
   final AuthService _authService = AuthService();
   int _currentNavIndex = 0;
+  Map<String, dynamic>? _liveUserData;
 
   // Warna Design System Penpot MotoManage
   static const Color bgDark = Color(0xFF0E1015);
@@ -28,6 +29,21 @@ class _BerandaPageState extends State<BerandaPage> {
   static const Color textMuted = Color(0xFF94A3B8);
   static const Color textDim = Color(0xFF64748B);
 
+  @override
+  void initState() {
+    super.initState();
+    _loadLiveUserData();
+  }
+
+  void _loadLiveUserData() async {
+    final profile = await _authService.getCurrentUserProfile();
+    if (profile != null && mounted) {
+      setState(() {
+        _liveUserData = profile;
+      });
+    }
+  }
+
   String _getUserInitials(String name) {
     if (name.trim().isEmpty) return 'U';
     final parts = name.trim().split(' ');
@@ -40,11 +56,15 @@ class _BerandaPageState extends State<BerandaPage> {
   @override
   Widget build(BuildContext context) {
     final currentUser = _authService.currentUser;
-    final String email = widget.userData?['email'] ?? currentUser?.email ?? '-';
-    final String username = widget.userData?['nama_lengkap'] ??
+    final String email = _liveUserData?['email'] ??
+        widget.userData?['email'] ??
+        currentUser?.email ??
+        '-';
+    final String username = _liveUserData?['nama_lengkap'] ??
+        widget.userData?['nama_lengkap'] ??
         currentUser?.displayName ??
-        'Sugeng Yulianto';
-    final String role = widget.userData?['role'] ?? 'Superadmin';
+        'Pengguna';
+    final String role = _liveUserData?['role'] ?? widget.userData?['role'] ?? 'Kasir';
     final String initials = _getUserInitials(username);
 
     return Scaffold(
@@ -93,7 +113,8 @@ class _BerandaPageState extends State<BerandaPage> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => ProfilPage(userData: widget.userData),
+                builder: (context) =>
+                    ProfilPage(userData: _liveUserData ?? widget.userData),
               ),
             );
           },
@@ -593,7 +614,8 @@ class _BerandaPageState extends State<BerandaPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ProfilPage(userData: widget.userData),
+                  builder: (context) =>
+                      ProfilPage(userData: _liveUserData ?? widget.userData),
                 ),
               );
             },

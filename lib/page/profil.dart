@@ -33,15 +33,42 @@ class _ProfilPageState extends State<ProfilPage> {
   static const Color textMuted = Color(0xFF9CA3AF);
   static const Color textDim = Color(0xFF6B7280);
 
-  // List Admin User lokal (bisa diintegrasikan ke Firestore 'user')
-  final List<Map<String, String>> _adminUsers = [
-    {
-      'initials': 'SE',
-      'name': 'Sri Ekowati',
-      'email': 'sri.eko@motomanage.id',
-      'role': 'Administrator',
-    },
-  ];
+  String? _customUsername;
+  Map<String, dynamic>? _liveUserData;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLiveUserData();
+  }
+
+  void _loadLiveUserData() async {
+    final profile = await _authService.getCurrentUserProfile();
+    if (profile != null && mounted) {
+      setState(() {
+        _liveUserData = profile;
+      });
+    } else {
+      final email =
+          widget.userData?['email'] ?? _authService.currentUser?.email;
+      if (email != null && email.isNotEmpty) {
+        final profileEmail = await _authService.getUserProfileByEmail(email);
+        if (profileEmail != null && mounted) {
+          setState(() {
+            _liveUserData = profileEmail;
+          });
+        }
+      }
+    }
+  }
+
+  bool get _isSuperAdmin {
+    final role = (_liveUserData?['role'] ?? widget.userData?['role'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    return role == 'superadmin';
+  }
 
   String _getUserInitials(String name) {
     if (name.trim().isEmpty) return 'U';
@@ -63,7 +90,7 @@ class _ProfilPageState extends State<ProfilPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: Color(0xFF143322),
-          content: Text('Kata sandi berhasil diperbarui!'),
+          content: Text('Kata sandi berhasil diperbarui di database Firebase!'),
         ),
       );
     }
@@ -71,75 +98,11 @@ class _ProfilPageState extends State<ProfilPage> {
 
   void _showEditProfileDialog(String currentName, String currentEmail) {
     final nameController = TextEditingController(text: currentName);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: cardBg,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: cardBorder),
-        ),
-        title: const Text('Ubah Data Diri',
-            style: TextStyle(color: textWhite, fontSize: 16, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Nama Lengkap', style: TextStyle(color: textMuted, fontSize: 12)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: nameController,
-              style: const TextStyle(color: textWhite),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: bgDark,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: cardBorder),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal', style: TextStyle(color: textDim)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: accentRed,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() {
-                if (widget.userData != null) {
-                  widget.userData!['nama_lengkap'] = nameController.text.trim();
-                }
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  backgroundColor: Color(0xFF143322),
-                  content: Text('Data profil berhasil disimpan'),
-                ),
-              );
-            },
-            child: const Text('Simpan', style: TextStyle(color: textWhite)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddUserDialog() {
-    final nameController = TextEditingController();
-    final emailController = TextEditingController();
-    String selectedRole = 'Administrator';
+    bool isLoading = false;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: cardBg,
@@ -147,7 +110,7 @@ class _ProfilPageState extends State<ProfilPage> {
             borderRadius: BorderRadius.circular(16),
             side: const BorderSide(color: cardBorder),
           ),
-          title: const Text('Tambah Pengguna Baru',
+          title: const Text('Ubah Data Diri',
               style: TextStyle(color: textWhite, fontSize: 16, fontWeight: FontWeight.bold)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -159,8 +122,6 @@ class _ProfilPageState extends State<ProfilPage> {
                 controller: nameController,
                 style: const TextStyle(color: textWhite),
                 decoration: InputDecoration(
-                  hintText: 'Contoh: Budi Santoso',
-                  hintStyle: const TextStyle(color: textDim),
                   filled: true,
                   fillColor: bgDark,
                   border: OutlineInputBorder(
@@ -170,54 +131,18 @@ class _ProfilPageState extends State<ProfilPage> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               const Text('Email', style: TextStyle(color: textMuted, fontSize: 12)),
-              const SizedBox(height: 6),
-              TextField(
-                controller: emailController,
-                style: const TextStyle(color: textWhite),
-                decoration: InputDecoration(
-                  hintText: 'user@motomanage.id',
-                  hintStyle: const TextStyle(color: textDim),
-                  filled: true,
-                  fillColor: bgDark,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: cardBorder),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text('Peran / Role', style: TextStyle(color: textMuted, fontSize: 12)),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                initialValue: selectedRole,
-                dropdownColor: cardBg,
-                style: const TextStyle(color: textWhite),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: bgDark,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: cardBorder),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'Administrator', child: Text('Administrator')),
-                  DropdownMenuItem(value: 'Kasir', child: Text('Kasir')),
-                  DropdownMenuItem(value: 'Mekanik', child: Text('Mekanik')),
-                ],
-                onChanged: (val) {
-                  if (val != null) setDialogState(() => selectedRole = val);
-                },
+              const SizedBox(height: 4),
+              Text(
+                currentEmail,
+                style: const TextStyle(color: textDim, fontSize: 13),
               ),
             ],
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
+              onPressed: isLoading ? null : () => Navigator.pop(ctx),
               child: const Text('Batal', style: TextStyle(color: textDim)),
             ),
             ElevatedButton(
@@ -225,31 +150,437 @@ class _ProfilPageState extends State<ProfilPage> {
                 backgroundColor: accentRed,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              onPressed: () {
-                final name = nameController.text.trim();
-                final email = emailController.text.trim();
-                if (name.isNotEmpty && email.isNotEmpty) {
-                  setState(() {
-                    _adminUsers.add({
-                      'initials': _getUserInitials(name),
-                      'name': name,
-                      'email': email,
-                      'role': selectedRole,
-                    });
-                  });
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: const Color(0xFF143322),
-                      content: Text('Pengguna $name berhasil ditambahkan!'),
-                    ),
-                  );
-                }
-              },
-              child: const Text('Tambah', style: TextStyle(color: textWhite)),
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      final newName = nameController.text.trim();
+                      if (newName.isEmpty) return;
+
+                      setDialogState(() => isLoading = true);
+                      try {
+                        // Simpan perubahan ke Firestore & Firebase Auth
+                        await _authService.updateUserProfile(namaLengkap: newName);
+
+                        if (mounted) {
+                          setState(() {
+                            _customUsername = newName;
+                            if (widget.userData != null) {
+                              widget.userData!['nama_lengkap'] = newName;
+                            }
+                          });
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              backgroundColor: Color(0xFF143322),
+                              content: Text('Data profil berhasil disimpan di Firebase!'),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setDialogState(() => isLoading = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: const Color(0xFF3B1517),
+                              content: Text('Gagal menyimpan profil: $e'),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Simpan', style: TextStyle(color: textWhite)),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showAddUserDialog() {
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    String selectedRole = 'Administrator';
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: cardBorder),
+          ),
+          title: const Text('Tambah Pengguna Baru',
+              style: TextStyle(color: textWhite, fontSize: 16, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Nama Lengkap', style: TextStyle(color: textMuted, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: nameController,
+                  style: const TextStyle(color: textWhite),
+                  decoration: InputDecoration(
+                    hintText: 'Contoh: Budi Santoso',
+                    hintStyle: const TextStyle(color: textDim),
+                    filled: true,
+                    fillColor: bgDark,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: cardBorder),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text('Email', style: TextStyle(color: textMuted, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: emailController,
+                  style: const TextStyle(color: textWhite),
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    hintText: 'user@motomanage.id',
+                    hintStyle: const TextStyle(color: textDim),
+                    filled: true,
+                    fillColor: bgDark,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: cardBorder),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text('Kata Sandi Awal', style: TextStyle(color: textMuted, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  style: const TextStyle(color: textWhite),
+                  decoration: InputDecoration(
+                    hintText: 'Minimal 6 karakter',
+                    hintStyle: const TextStyle(color: textDim),
+                    filled: true,
+                    fillColor: bgDark,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: cardBorder),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text('Peran / Role', style: TextStyle(color: textMuted, fontSize: 12)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedRole,
+                  dropdownColor: cardBg,
+                  style: const TextStyle(color: textWhite),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: bgDark,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: cardBorder),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Administrator', child: Text('Administrator')),
+                    DropdownMenuItem(value: 'Kasir', child: Text('Kasir')),
+                    DropdownMenuItem(value: 'Mekanik', child: Text('Mekanik')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => selectedRole = val);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(ctx),
+              child: const Text('Batal', style: TextStyle(color: textDim)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentRed,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      final name = nameController.text.trim();
+                      final email = emailController.text.trim();
+                      final password = passwordController.text.trim();
+
+                      if (name.isEmpty || email.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            backgroundColor: Color(0xFF3B1517),
+                            content: Text('Nama dan email wajib diisi!'),
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => isLoading = true);
+
+                      try {
+                        // Simpan user baru langsung ke database Firestore
+                        await _authService.addNewUser(
+                          namaLengkap: name,
+                          email: email,
+                          role: selectedRole,
+                          password: password.isNotEmpty ? password : null,
+                        );
+
+                        if (mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: const Color(0xFF143322),
+                              content: Text('Pengguna $name berhasil ditambahkan ke Firebase!'),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setDialogState(() => isLoading = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: const Color(0xFF3B1517),
+                              content: Text('Gagal menambahkan pengguna: $e'),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Tambah', style: TextStyle(color: textWhite)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditUserDialog(Map<String, dynamic> user) {
+    final nameController = TextEditingController(text: user['nama_lengkap'] ?? user['name'] ?? '');
+    final emailController = TextEditingController(text: user['email'] ?? '');
+    String selectedRole = user['role'] ?? 'Kasir';
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: cardBorder),
+          ),
+          title: Text('Edit Data ${user['nama_lengkap'] ?? 'Pengguna'}',
+              style: const TextStyle(color: textWhite, fontSize: 16, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Nama Lengkap', style: TextStyle(color: textMuted, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: nameController,
+                  style: const TextStyle(color: textWhite),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: bgDark,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: cardBorder),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text('Email', style: TextStyle(color: textMuted, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: emailController,
+                  style: const TextStyle(color: textWhite),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: bgDark,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: cardBorder),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text('Peran / Role', style: TextStyle(color: textMuted, fontSize: 12)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedRole,
+                  dropdownColor: cardBg,
+                  style: const TextStyle(color: textWhite),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: bgDark,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: cardBorder),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Administrator', child: Text('Administrator')),
+                    DropdownMenuItem(value: 'Kasir', child: Text('Kasir')),
+                    DropdownMenuItem(value: 'Mekanik', child: Text('Mekanik')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => selectedRole = val);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(ctx),
+              child: const Text('Batal', style: TextStyle(color: textDim)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentRed,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      final name = nameController.text.trim();
+                      final email = emailController.text.trim();
+                      final docId = user['id'];
+
+                      if (name.isEmpty || email.isEmpty) return;
+
+                      setDialogState(() => isLoading = true);
+                      try {
+                        await _authService.updateUser(
+                          docId: docId,
+                          namaLengkap: name,
+                          email: email,
+                          role: selectedRole,
+                        );
+
+                        if (mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: const Color(0xFF143322),
+                              content: Text('Data $name berhasil diperbarui di Firebase!'),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setDialogState(() => isLoading = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: const Color(0xFF3B1517),
+                              content: Text('Gagal memperbarui pengguna: $e'),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Simpan', style: TextStyle(color: textWhite)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteUserDialog(Map<String, dynamic> user) {
+    final String name = user['nama_lengkap'] ?? user['name'] ?? 'Pengguna';
+    final String docId = user['id'];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: cardBorder),
+        ),
+        title: const Text('Konfirmasi Hapus',
+            style: TextStyle(color: textWhite, fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus pengguna $name dari database Firebase?',
+          style: const TextStyle(color: textMuted, fontSize: 13.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal', style: TextStyle(color: textDim)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentRed,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await _authService.deleteUser(docId);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: const Color(0xFF143322),
+                      content: Text('Pengguna $name berhasil dihapus dari Firebase!'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: const Color(0xFF3B1517),
+                      content: Text('Gagal menghapus pengguna: $e'),
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Hapus', style: TextStyle(color: textWhite)),
+          ),
+        ],
       ),
     );
   }
@@ -302,13 +633,20 @@ class _ProfilPageState extends State<ProfilPage> {
   @override
   Widget build(BuildContext context) {
     final currentUser = _authService.currentUser;
-    final String email = widget.userData?['email'] ??
+    final String email = _liveUserData?['email'] ??
+        widget.userData?['email'] ??
         currentUser?.email ??
         'sugeng@motomanage.id';
-    final String username = widget.userData?['nama_lengkap'] ??
+    final String username = _customUsername ??
+        _liveUserData?['nama_lengkap'] ??
+        widget.userData?['nama_lengkap'] ??
         currentUser?.displayName ??
-        'Sugeng Yulianto';
-    final String role = (widget.userData?['role'] ?? 'SUPERADMIN').toString().toUpperCase();
+        'Pengguna';
+    final String role = (_liveUserData?['role'] ??
+            widget.userData?['role'] ??
+            'Kasir')
+        .toString()
+        .toUpperCase();
     final String initials = _getUserInitials(username);
 
     return Scaffold(
@@ -340,7 +678,7 @@ class _ProfilPageState extends State<ProfilPage> {
               ),
               const SizedBox(height: 18),
 
-              // 2. Card Profil Utama (SY, Sugeng Yulianto, SUPERADMIN)
+              // 2. Card Profil Utama (Inisial, Nama, Email, Role)
               _buildUserProfileCard(initials, username, email, role),
               const SizedBox(height: 24),
 
@@ -378,34 +716,96 @@ class _ProfilPageState extends State<ProfilPage> {
               ),
               const SizedBox(height: 24),
 
-              // 4. Section Kelola Pengguna Administrator
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Kelola Pengguna Administrator',
-                    style: TextStyle(
-                      color: textWhite,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _showAddUserDialog,
-                    child: const Text(
-                      '+ Tambah User',
+              // 4. Section Kelola Pengguna Administrator (HANYA DITAMPILKAN JIKA ROLE = SUPERADMIN)
+              if (_isSuperAdmin) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Kelola Pengguna Administrator',
                       style: TextStyle(
-                        color: accentRed,
-                        fontSize: 11,
+                        color: textWhite,
+                        fontSize: 12.5,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ..._adminUsers.map((admin) => _buildAdminUserCard(admin)),
-              const SizedBox(height: 24),
+                    GestureDetector(
+                      onTap: _showAddUserDialog,
+                      child: const Text(
+                        '+ Tambah User',
+                        style: TextStyle(
+                          color: accentRed,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: _authService.streamUsers(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: accentRed,
+                          ),
+                        ),
+                      );
+                    }
+
+                    if (snapshot.hasError) {
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: cardBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: cardBorder),
+                        ),
+                        child: Text(
+                          'Gagal memuat pengguna: ${snapshot.error}',
+                          style: const TextStyle(color: accentRed, fontSize: 12),
+                        ),
+                      );
+                    }
+
+                    final users = snapshot.data ?? [];
+
+                    if (users.isEmpty) {
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: cardBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: cardBorder),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Belum ada pengguna terdaftar di Firebase.',
+                            style: TextStyle(color: textMuted, fontSize: 12),
+                          ),
+                        ),
+                      );
+                    }
+
+                    return Column(
+                      children: users.map((user) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _buildAdminUserCard(user),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+                const SizedBox(height: 24),
+              ],
 
               // 5. Card Pencadangan Data Basis Data
               _buildBackupCard(),
@@ -548,7 +948,12 @@ class _ProfilPageState extends State<ProfilPage> {
     );
   }
 
-  Widget _buildAdminUserCard(Map<String, String> admin) {
+  Widget _buildAdminUserCard(Map<String, dynamic> admin) {
+    final String name = admin['nama_lengkap'] ?? admin['name'] ?? 'Pengguna';
+    final String email = admin['email'] ?? '-';
+    final String role = admin['role'] ?? 'Kasir';
+    final String initials = _getUserInitials(name);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -569,7 +974,7 @@ class _ProfilPageState extends State<ProfilPage> {
             ),
             child: Center(
               child: Text(
-                admin['initials'] ?? 'SE',
+                initials,
                 style: const TextStyle(
                   color: accentBlue,
                   fontSize: 12,
@@ -586,7 +991,7 @@ class _ProfilPageState extends State<ProfilPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  admin['name'] ?? '',
+                  name,
                   style: const TextStyle(
                     color: textWhite,
                     fontSize: 12,
@@ -595,7 +1000,7 @@ class _ProfilPageState extends State<ProfilPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${admin['email']} • ${admin['role']}',
+                  '$email • $role',
                   style: const TextStyle(
                     color: textMuted,
                     fontSize: 9.5,
@@ -608,14 +1013,7 @@ class _ProfilPageState extends State<ProfilPage> {
 
           // Tombol Edit (Pensil)
           GestureDetector(
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  backgroundColor: cardBg,
-                  content: Text('Edit data ${admin['name']}'),
-                ),
-              );
-            },
+            onTap: () => _showEditUserDialog(admin),
             child: Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
@@ -629,15 +1027,7 @@ class _ProfilPageState extends State<ProfilPage> {
 
           // Tombol Hapus (Tong Sampah)
           GestureDetector(
-            onTap: () {
-              setState(() => _adminUsers.remove(admin));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  backgroundColor: const Color(0xFF3B1517),
-                  content: Text('${admin['name']} berhasil dihapus'),
-                ),
-              );
-            },
+            onTap: () => _showDeleteUserDialog(admin),
             child: Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
