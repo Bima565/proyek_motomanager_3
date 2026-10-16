@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../components/create_password_dialog.dart';
 import '../hooks/firebase_auth.dart';
+import 'login.dart';
 import 'profil.dart';
 import 'sparepart.dart';
 
@@ -33,6 +35,43 @@ class _BerandaPageState extends State<BerandaPage> {
   void initState() {
     super.initState();
     _loadLiveUserData();
+    _checkPasswordStatus();
+  }
+
+  void _checkPasswordStatus() async {
+    final hasPass = await _authService.userHasPassword();
+    if (!hasPass && mounted) {
+      final email = _liveUserData?['email'] ??
+          widget.userData?['email'] ??
+          _authService.currentUser?.email ??
+          '';
+
+      if (email.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) return;
+          final created = await CreatePasswordDialog.show(
+            context,
+            email: email,
+            isChangePassword: false,
+          );
+
+          if (!mounted) return;
+
+          if (created == true) {
+            _loadLiveUserData();
+          } else {
+            // Jika user belum memiliki password dan membatalkan dialog, logout
+            await _authService.signOut();
+            if (!mounted) return;
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginPage()),
+              (route) => false,
+            );
+          }
+        });
+      }
+    }
   }
 
   void _loadLiveUserData() async {

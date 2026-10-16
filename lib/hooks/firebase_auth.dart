@@ -176,6 +176,7 @@ class AuthService {
       'no_telepon': noTelepon,
       'role': role,
       'status': true,
+      'has_password': true,
       'created_at': FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
     };

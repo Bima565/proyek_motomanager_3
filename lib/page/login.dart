@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../components/create_password_dialog.dart';
 import '../components/password_forget.dart';
 import '../hooks/firebase_auth.dart';
 import 'beranda.dart';
@@ -162,6 +163,45 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       if (userData != null) {
+        final email =
+            userData['email'] ?? _authService.currentUser?.email ?? '';
+
+        // Cek apakah akun baru / belum memiliki password native
+        final hasPassword = await _authService.userHasPassword();
+
+        if (!mounted) return;
+
+        if (!hasPassword && email.isNotEmpty) {
+          setState(() => _isLoading = false);
+
+          final created = await CreatePasswordDialog.show(
+            context,
+            email: email,
+            isChangePassword: false,
+          );
+
+          if (!mounted) return;
+
+          if (created != true) {
+            // User membatalkan pembuatan password -> logout dan kembali ke login
+            await _authService.signOut();
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                backgroundColor: Color(0xFF3B1517),
+                behavior: SnackBarBehavior.floating,
+                content: Text(
+                  'Pendaftaran belum selesai: Kata sandi wajib dibuat untuk akun baru.',
+                  style: TextStyle(color: textWhite),
+                ),
+              ),
+            );
+            return;
+          }
+        }
+
+        if (!mounted) return;
+
         final nama = userData['nama_lengkap'] ?? 'Pengguna';
         final role = userData['role'] ?? 'Kasir';
 
@@ -191,7 +231,7 @@ class _LoginPageState extends State<LoginPage> {
           ),
         );
 
-        // Pindah langsung ke halaman Beranda / Dashboard (FR02)
+        // Pindah ke halaman Beranda / Dashboard (FR02)
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
