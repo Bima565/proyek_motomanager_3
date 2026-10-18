@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'sparepart.dart';
+import 'data_sparepart.dart';
 
 class TambahSparepartPage extends StatefulWidget {
   const TambahSparepartPage({super.key});

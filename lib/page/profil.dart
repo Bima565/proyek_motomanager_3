@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../components/create_password_dialog.dart';
+import '../components/moto_bottom_nav.dart';
 import '../hooks/firebase_auth.dart';
 import 'dasboard.dart';
 import 'login.dart';
-import 'sparepart.dart';
 
 class ProfilPage extends StatefulWidget {
   final Map<String, dynamic>? userData;
@@ -817,7 +817,10 @@ class _ProfilPageState extends State<ProfilPage> {
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNavigation(),
+      bottomNavigationBar: MotoBottomNav(
+        currentIndex: 4,
+        userData: _liveUserData ?? widget.userData,
+      ),
     );
   }
 
@@ -1099,121 +1102,6 @@ class _ProfilPageState extends State<ProfilPage> {
                 color: accentRed,
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomNavigation() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0C0E13),
-        border: Border(top: BorderSide(color: Color(0xFF1B202D), width: 1)),
-      ),
-      padding: const EdgeInsets.only(top: 8, bottom: 20, left: 16, right: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          // 1. Beranda
-          _buildNavItem(
-            icon: Icons.home_rounded,
-            label: 'Beranda',
-            isActive: false,
-            onTap: () {
-              if (widget.onNavigateTab != null) {
-                widget.onNavigateTab!(0);
-              } else {
-                Navigator.pop(context);
-              }
-            },
-          ),
-          // 2. Kasir
-          _buildNavItem(
-            icon: Icons.receipt_long_rounded,
-            label: 'Kasir',
-            isActive: false,
-          ),
-          // 3. Stok
-          _buildNavItem(
-            icon: Icons.inventory_2_outlined,
-            label: 'Stok',
-            isActive: false,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SparepartPage(),
-                ),
-              );
-            },
-          ),
-          // 4. Laporan
-          _buildNavItem(
-            icon: Icons.bar_chart_rounded,
-            label: 'Laporan',
-            isActive: false,
-          ),
-          // 5. Profil (Active Capsule)
-          _buildNavItem(
-            icon: Icons.person_rounded,
-            label: 'Profil',
-            isActive: true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    VoidCallback? onTap,
-  }) {
-    if (isActive) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: accentRed,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: textWhite, size: 18),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                color: textWhite,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: textDim, size: 20),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: const TextStyle(
-                color: textDim,
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
               ),
             ),
           ],

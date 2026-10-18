@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../components/create_password_dialog.dart';
+import '../components/moto_bottom_nav.dart';
 import '../hooks/firebase_auth.dart';
+import 'data_sparepart.dart';
+import 'laporan_pendapatan.dart';
 import 'login.dart';
 import 'profil.dart';
-import 'sparepart.dart';
+import 'riwayat_transaksi.dart';
 
 class BerandaPage extends StatefulWidget {
   final Map<String, dynamic>? userData;
@@ -16,7 +19,6 @@ class BerandaPage extends StatefulWidget {
 
 class _BerandaPageState extends State<BerandaPage> {
   final AuthService _authService = AuthService();
-  int _currentNavIndex = 0;
   Map<String, dynamic>? _liveUserData;
 
   // Warna Design System Penpot MotoManage
@@ -137,7 +139,10 @@ class _BerandaPageState extends State<BerandaPage> {
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNavigation(email, username, role),
+      bottomNavigationBar: MotoBottomNav(
+        currentIndex: 0,
+        userData: _liveUserData ?? widget.userData,
+      ),
     );
   }
 
@@ -178,71 +183,87 @@ class _BerandaPageState extends State<BerandaPage> {
           ),
         ),
         const SizedBox(width: 14),
-        // Nama dan Role Badge
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              username,
-              style: const TextStyle(
-                color: textWhite,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2.5),
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: accentRed, width: 1),
-              ),
-              child: Text(
-                role,
+        // Nama dan Role Badge (Responsif)
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                username,
                 style: const TextStyle(
-                  color: accentRed,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
+                  color: textWhite,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: accentRed, width: 1),
+                ),
+                child: Text(
+                  role,
+                  style: const TextStyle(
+                    color: accentRed,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
   }
 
   Widget _buildOmzetCard(String nominal) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: cardBorder, width: 1),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'Omzet Hari Ini',
-            style: TextStyle(
-              color: textMuted,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LaporanPendapatanPage(
+              userData: _liveUserData ?? widget.userData,
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            nominal,
-            style: const TextStyle(
-              color: textWhite,
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: cardBorder, width: 1),
+        ),
+        child: Column(
+          children: [
+            const Text(
+              'Omzet Hari Ini',
+              style: TextStyle(
+                color: textMuted,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 6),
+            Text(
+              nominal,
+              style: const TextStyle(
+                color: textWhite,
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -262,15 +283,18 @@ class _BerandaPageState extends State<BerandaPage> {
           // Baris Atas: Judul, Badge Tanggal, Tombol Detail
           Row(
             children: [
-              const Text(
-                'Pendapatan Hari Ini',
-                style: TextStyle(
-                  color: textWhite,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
+              const Flexible(
+                child: Text(
+                  'Pendapatan Hari Ini',
+                  style: TextStyle(
+                    color: textWhite,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               // Badge Tanggal
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -289,18 +313,30 @@ class _BerandaPageState extends State<BerandaPage> {
               ),
               const SizedBox(width: 8),
               // Tombol Detail
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1D2333),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Detail ›',
-                  style: TextStyle(
-                    color: Color(0xFF60A5FA),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => LaporanPendapatanPage(
+                        userData: _liveUserData ?? widget.userData,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1D2333),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Detail ›',
+                    style: TextStyle(
+                      color: Color(0xFF60A5FA),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -385,7 +421,9 @@ class _BerandaPageState extends State<BerandaPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const SparepartPage(),
+                    builder: (context) => DataSparepartPage(
+                      userData: _liveUserData ?? widget.userData,
+                    ),
                   ),
                 );
               },
@@ -495,18 +533,30 @@ class _BerandaPageState extends State<BerandaPage> {
           ),
 
           // Tombol Restock
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-            decoration: BoxDecoration(
-              color: isCritical ? accentRed : const Color(0xFF1D2333),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              'Restock',
-              style: TextStyle(
-                color: isCritical ? textWhite : const Color(0xFFE2E8F0),
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DataSparepartPage(
+                    userData: _liveUserData ?? widget.userData,
+                  ),
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+              decoration: BoxDecoration(
+                color: isCritical ? accentRed : const Color(0xFF1D2333),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'Restock',
+                style: TextStyle(
+                  color: isCritical ? textWhite : const Color(0xFFE2E8F0),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -529,199 +579,83 @@ class _BerandaPageState extends State<BerandaPage> {
         ),
         const SizedBox(height: 12),
 
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: cardBorder, width: 1),
-          ),
-          child: Row(
-            children: [
-              // Icon Motor
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF191D2A),
-                  borderRadius: BorderRadius.circular(10),
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => RiwayatTransaksiPage(
+                  userData: _liveUserData ?? widget.userData,
                 ),
-                child: const Center(
-                  child: Icon(
-                    Icons.two_wheeler_rounded,
-                    color: accentRed,
-                    size: 22,
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: cardBorder, width: 1),
+            ),
+            child: Row(
+              children: [
+                // Icon Motor
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF191D2A),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.two_wheeler_rounded,
+                      color: accentRed,
+                      size: 22,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 14),
+                const SizedBox(width: 14),
 
-              // Info Kendaraan & Waktu
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Honda Vario 160 (B 4921 KDF)',
-                      style: TextStyle(
-                        color: textWhite,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                // Info Kendaraan & Waktu
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Honda Vario 160 (B 4921 KDF)',
+                        style: TextStyle(
+                          color: textWhite,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      '10:15',
-                      style: TextStyle(
-                        color: textDim,
-                        fontSize: 11,
+                      SizedBox(height: 4),
+                      Text(
+                        '10:15',
+                        style: TextStyle(
+                          color: textDim,
+                          fontSize: 11,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              // Total Biaya Transaksi
-              const Text(
-                'Rp 175.000',
-                style: TextStyle(
-                  color: accentGreen,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
+                // Total Biaya Transaksi
+                const Text(
+                  'Rp 175.000',
+                  style: TextStyle(
+                    color: accentGreen,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildBottomNavigation(String email, String username, String role) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0C0E13),
-        border: Border(top: BorderSide(color: Color(0xFF1B202D), width: 1)),
-      ),
-      padding: const EdgeInsets.only(top: 8, bottom: 20, left: 16, right: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          // 1. Beranda (Active Capsule)
-          _buildNavItem(
-            index: 0,
-            icon: Icons.home_rounded,
-            label: 'Beranda',
-            isActive: _currentNavIndex == 0,
-          ),
-          // 2. Kasir
-          _buildNavItem(
-            index: 1,
-            icon: Icons.receipt_long_rounded,
-            label: 'Kasir',
-            isActive: _currentNavIndex == 1,
-          ),
-          // 3. Stok
-          _buildNavItem(
-            index: 2,
-            icon: Icons.inventory_2_outlined,
-            label: 'Stok',
-            isActive: _currentNavIndex == 2,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SparepartPage(),
-                ),
-              );
-            },
-          ),
-          // 4. Laporan
-          _buildNavItem(
-            index: 3,
-            icon: Icons.bar_chart_rounded,
-            label: 'Laporan',
-            isActive: _currentNavIndex == 3,
-          ),
-          // 5. Profil
-          _buildNavItem(
-            index: 4,
-            icon: Icons.person_outline_rounded,
-            label: 'Profil',
-            isActive: _currentNavIndex == 4,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      ProfilPage(userData: _liveUserData ?? widget.userData),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required int index,
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    VoidCallback? onTap,
-  }) {
-    if (isActive) {
-      // Tombol Aktif: Kapsul Merah Terang
-      return GestureDetector(
-        onTap: () => setState(() => _currentNavIndex = index),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: accentRed,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: textWhite, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: textWhite,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // Tombol Normal / Tidak Aktif
-    return GestureDetector(
-      onTap: onTap ?? () => setState(() => _currentNavIndex = index),
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: textDim, size: 20),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: const TextStyle(
-                color: textDim,
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
