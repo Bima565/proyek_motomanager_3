@@ -4,8 +4,13 @@ import '../components/moto_bottom_nav.dart';
 /// Screen 12 - (FR07) Riwayat Transaksi & Kasir
 class RiwayatTransaksiPage extends StatefulWidget {
   final Map<String, dynamic>? userData;
+  final bool showBottomNav;
 
-  const RiwayatTransaksiPage({super.key, this.userData});
+  const RiwayatTransaksiPage({
+    super.key,
+    this.userData,
+    this.showBottomNav = true,
+  });
 
   @override
   State<RiwayatTransaksiPage> createState() => _RiwayatTransaksiPageState();
@@ -283,10 +288,12 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
           ],
         ),
       ),
-      bottomNavigationBar: MotoBottomNav(
-        currentIndex: 1,
-        userData: widget.userData,
-      ),
+      bottomNavigationBar: (widget.showBottomNav == true)
+          ? MotoBottomNav(
+              currentIndex: 1,
+              userData: widget.userData,
+            )
+          : null,
     );
   }
 

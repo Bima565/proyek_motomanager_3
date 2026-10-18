@@ -6,8 +6,13 @@ import 'tambah_sparepart.dart';
 /// Screen 11 - (FR05, FR06) Navigasi Tambah Data Stok & Jasa
 class KelolaStokJasaPage extends StatefulWidget {
   final Map<String, dynamic>? userData;
+  final bool showBottomNav;
 
-  const KelolaStokJasaPage({super.key, this.userData});
+  const KelolaStokJasaPage({
+    super.key,
+    this.userData,
+    this.showBottomNav = true,
+  });
 
   @override
   State<KelolaStokJasaPage> createState() => _KelolaStokJasaPageState();
@@ -114,10 +119,12 @@ class _KelolaStokJasaPageState extends State<KelolaStokJasaPage> {
           ),
         ),
       ),
-      bottomNavigationBar: MotoBottomNav(
-        currentIndex: 2,
-        userData: widget.userData,
-      ),
+      bottomNavigationBar: (widget.showBottomNav == true)
+          ? MotoBottomNav(
+              currentIndex: 2,
+              userData: widget.userData,
+            )
+          : null,
     );
   }
 

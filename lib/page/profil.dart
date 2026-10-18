@@ -8,11 +8,13 @@ import 'login.dart';
 class ProfilPage extends StatefulWidget {
   final Map<String, dynamic>? userData;
   final Function(int)? onNavigateTab;
+  final bool showBottomNav;
 
   const ProfilPage({
     super.key,
     this.userData,
     this.onNavigateTab,
+    this.showBottomNav = true,
   });
 
   @override
@@ -817,10 +819,12 @@ class _ProfilPageState extends State<ProfilPage> {
           ),
         ),
       ),
-      bottomNavigationBar: MotoBottomNav(
-        currentIndex: 4,
-        userData: _liveUserData ?? widget.userData,
-      ),
+      bottomNavigationBar: (widget.showBottomNav == true)
+          ? MotoBottomNav(
+              currentIndex: 4,
+              userData: _liveUserData ?? widget.userData,
+            )
+          : null,
     );
   }
 

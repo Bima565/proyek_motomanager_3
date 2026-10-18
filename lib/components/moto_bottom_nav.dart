@@ -8,11 +8,13 @@ import '../page/riwayat_transaksi.dart';
 class MotoBottomNav extends StatelessWidget {
   final int currentIndex;
   final Map<String, dynamic>? userData;
+  final ValueChanged<int>? onTabSelected;
 
   const MotoBottomNav({
     super.key,
     required this.currentIndex,
     this.userData,
+    this.onTabSelected,
   });
 
   static const Color navBg = Color(0xFF0C0E13);
@@ -24,10 +26,15 @@ class MotoBottomNav extends StatelessWidget {
   void _onItemTapped(BuildContext context, int index) {
     if (index == currentIndex) return;
 
+    if (onTabSelected != null) {
+      onTabSelected!(index);
+      return;
+    }
+
     Widget targetPage;
     switch (index) {
       case 0:
-        targetPage = BerandaPage(userData: userData);
+        targetPage = BerandaPage(userData: userData, initialIndex: 0);
         break;
       case 1:
         targetPage = RiwayatTransaksiPage(userData: userData);
@@ -45,12 +52,23 @@ class MotoBottomNav extends StatelessWidget {
         return;
     }
 
+    final isForward = index > currentIndex;
+
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
         pageBuilder: (context, anim1, anim2) => targetPage,
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final begin = Offset(isForward ? 1.0 : -1.0, 0.0);
+          final end = Offset.zero;
+          final tween = Tween(begin: begin, end: end)
+              .chain(CurveTween(curve: Curves.easeOutCubic));
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 320),
       ),
     );
   }
@@ -69,7 +87,7 @@ class MotoBottomNav extends StatelessWidget {
         top: false,
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: isCompact ? 8 : 14,
+            horizontal: isCompact ? 6 : 12,
             vertical: 8,
           ),
           child: Row(
@@ -130,57 +148,44 @@ class MotoBottomNav extends StatelessWidget {
     required bool isActive,
     required bool isCompact,
   }) {
-    if (isActive) {
-      return GestureDetector(
-        onTap: () => _onItemTapped(context, index),
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: isCompact ? 10 : 14,
-            vertical: 7,
-          ),
-          decoration: BoxDecoration(
-            color: accentRed,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: textWhite, size: isCompact ? 16 : 18),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  color: textWhite,
-                  fontSize: isCompact ? 10 : 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return GestureDetector(
       onTap: () => _onItemTapped(context, index),
       behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: isCompact ? 6 : 10,
-          vertical: 4,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        width: isCompact ? 58 : 64,
+        height: 48,
+        decoration: BoxDecoration(
+          color: isActive ? accentRed : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: accentRed.withValues(alpha: 0.4),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: textDim, size: isCompact ? 18 : 20),
-            const SizedBox(height: 3),
+            Icon(
+              icon,
+              color: isActive ? textWhite : textDim,
+              size: 20,
+            ),
+            const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
-                color: textDim,
-                fontSize: isCompact ? 9 : 10,
-                fontWeight: FontWeight.w500,
+                color: isActive ? textWhite : textDim,
+                fontSize: 10.5,
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                letterSpacing: -0.2,
               ),
             ),
           ],

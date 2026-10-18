@@ -5,8 +5,13 @@ import '../components/moto_bottom_nav.dart';
 /// Screen 7 - (FR09) Laporan Pendapatan & Analitik Bengkel
 class LaporanPendapatanPage extends StatefulWidget {
   final Map<String, dynamic>? userData;
+  final bool showBottomNav;
 
-  const LaporanPendapatanPage({super.key, this.userData});
+  const LaporanPendapatanPage({
+    super.key,
+    this.userData,
+    this.showBottomNav = true,
+  });
 
   @override
   State<LaporanPendapatanPage> createState() => _LaporanPendapatanPageState();
@@ -102,10 +107,12 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
           ),
         ),
       ),
-      bottomNavigationBar: MotoBottomNav(
-        currentIndex: 3,
-        userData: widget.userData,
-      ),
+      bottomNavigationBar: (widget.showBottomNav == true)
+          ? MotoBottomNav(
+              currentIndex: 3,
+              userData: widget.userData,
+            )
+          : null,
     );
   }
 
