@@ -105,7 +105,7 @@ class MotoBottomNav extends StatelessWidget {
                 context: context,
                 index: 1,
                 icon: Icons.receipt_long_rounded,
-                label: 'Kasir',
+                label: 'Transaksi',
                 isActive: currentIndex == 1,
                 isCompact: isCompact,
               ),
