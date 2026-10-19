@@ -1,0 +1,957 @@
+import 'package:flutter/material.dart';
+import 'nota_pembayaran.dart';
+
+class KasirItemModel {
+  String id;
+  String name;
+  String category;
+  String subInfo;
+  int price;
+  int quantity;
+  bool isService;
+
+  KasirItemModel({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.subInfo,
+    required this.price,
+    this.quantity = 1,
+    required this.isService,
+  });
+
+  int get total => price * quantity;
+}
+
+/// Screen 3 - (FR07) Kasir & Transaksi
+class KasirTransaksiPage extends StatefulWidget {
+  final Map<String, dynamic>? userData;
+
+  const KasirTransaksiPage({super.key, this.userData});
+
+  @override
+  State<KasirTransaksiPage> createState() => _KasirTransaksiPageState();
+}
+
+class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
+  // Warna Design System Penpot MotoManage
+  static const Color bgDark = Color(0xFF0E1015);
+  static const Color cardBg = Color(0xFF151821);
+  static const Color cardBorder = Color(0xFF222634);
+  static const Color accentRed = Color(0xFFFF1E27);
+  static const Color accentBlue = Color(0xFF38BDF8);
+  static const Color accentGreen = Color(0xFF22C55E);
+  static const Color accentOrange = Color(0xFFF59E0B);
+  static const Color textWhite = Color(0xFFFFFFFF);
+  static const Color textMuted = Color(0xFF94A3B8);
+  static const Color textDim = Color(0xFF64748B);
+
+  // Data Pelanggan & Motor
+  String _customerName = 'Bpk. Rahmat Santoso';
+  String _vehicleInfo = 'Honda Vario 160';
+  String _policeNumber = 'B 4921 KDF';
+  final String _trxCode = 'TRX-20260929-026';
+
+  // Metode Pembayaran ('Tunai' atau 'QRIS')
+  String _paymentMethod = 'Tunai';
+
+  // Daftar Item Transaksi
+  late List<KasirItemModel> _items;
+
+  @override
+  void initState() {
+    super.initState();
+    _items = [
+      KasirItemModel(
+        id: '1',
+        name: 'Jasa Servis Lengkap + Tune Up',
+        category: 'Jasa Servis',
+        subInfo: 'Ongkos Mekanik',
+        price: 80000,
+        quantity: 1,
+        isService: true,
+      ),
+      KasirItemModel(
+        id: '2',
+        name: 'Oli Shell Advance AX7 0.8L',
+        category: 'Oli & Pelumas',
+        subInfo: 'Sisa: 12',
+        price: 65000,
+        quantity: 1,
+        isService: false,
+      ),
+      KasirItemModel(
+        id: '3',
+        name: 'Busi NGK CPR9EA-9',
+        category: 'Kelistrikan',
+        subInfo: 'Sisa: 18',
+        price: 30000,
+        quantity: 1,
+        isService: false,
+      ),
+    ];
+  }
+
+  int get _totalBayar => _items.fold(0, (sum, item) => sum + item.total);
+
+  String _formatRupiah(int nominal) {
+    final str = nominal.toString();
+    final buffer = StringBuffer();
+    int count = 0;
+    for (int i = str.length - 1; i >= 0; i--) {
+      buffer.write(str[i]);
+      count++;
+      if (count % 3 == 0 && i != 0) {
+        buffer.write('.');
+      }
+    }
+    return 'Rp ${buffer.toString().split('').reversed.join('')}';
+  }
+
+  void _showEditCustomerDialog() {
+    final nameCtrl = TextEditingController(text: _customerName);
+    final vehicleCtrl = TextEditingController(text: _vehicleInfo);
+    final platCtrl = TextEditingController(text: _policeNumber);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: cardBorder),
+        ),
+        title: const Text(
+          'Edit Data Pelanggan',
+          style: TextStyle(color: textWhite, fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Nama Pelanggan', style: TextStyle(color: textMuted, fontSize: 11)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: nameCtrl,
+              style: const TextStyle(color: textWhite, fontSize: 13),
+              decoration: _buildInputDecoration('Nama pelanggan'),
+            ),
+            const SizedBox(height: 12),
+            const Text('Motor / Kendaraan', style: TextStyle(color: textMuted, fontSize: 11)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: vehicleCtrl,
+              style: const TextStyle(color: textWhite, fontSize: 13),
+              decoration: _buildInputDecoration('Contoh: Honda Vario 160'),
+            ),
+            const SizedBox(height: 12),
+            const Text('Nomor Plat', style: TextStyle(color: textMuted, fontSize: 11)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: platCtrl,
+              style: const TextStyle(color: textWhite, fontSize: 13),
+              decoration: _buildInputDecoration('Contoh: B 4921 KDF'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal', style: TextStyle(color: textDim)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentRed,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              setState(() {
+                _customerName = nameCtrl.text.trim();
+                _vehicleInfo = vehicleCtrl.text.trim();
+                _policeNumber = platCtrl.text.trim();
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('Simpan', style: TextStyle(color: textWhite)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddItemDialog() {
+    final nameCtrl = TextEditingController();
+    final priceCtrl = TextEditingController();
+    bool isJasa = true;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: cardBorder),
+          ),
+          title: const Text(
+            'Tambah Item Transaksi',
+            style: TextStyle(color: textWhite, fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Center(child: Text('Jasa Servis')),
+                      selected: isJasa,
+                      selectedColor: accentRed,
+                      backgroundColor: bgDark,
+                      labelStyle: TextStyle(
+                        color: isJasa ? textWhite : textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      onSelected: (val) => setDialogState(() => isJasa = true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Center(child: Text('Sparepart')),
+                      selected: !isJasa,
+                      selectedColor: accentRed,
+                      backgroundColor: bgDark,
+                      labelStyle: TextStyle(
+                        color: !isJasa ? textWhite : textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      onSelected: (val) => setDialogState(() => isJasa = false),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(isJasa ? 'Nama Jasa Servis' : 'Nama Sparepart',
+                  style: const TextStyle(color: textMuted, fontSize: 11)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: nameCtrl,
+                style: const TextStyle(color: textWhite, fontSize: 13),
+                decoration: _buildInputDecoration(
+                    isJasa ? 'Contoh: Bersihkan Injektor' : 'Contoh: Kampas Rem'),
+              ),
+              const SizedBox(height: 12),
+              const Text('Harga / Tarif (Rp)', style: TextStyle(color: textMuted, fontSize: 11)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: priceCtrl,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: accentGreen, fontSize: 13, fontWeight: FontWeight.bold),
+                decoration: _buildInputDecoration('Contoh: 35000', prefix: 'Rp '),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Batal', style: TextStyle(color: textDim)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentRed,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                final price = int.tryParse(priceCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                if (name.isNotEmpty && price > 0) {
+                  setState(() {
+                    _items.add(
+                      KasirItemModel(
+                        id: DateTime.now().millisecondsSinceEpoch.toString(),
+                        name: name,
+                        category: isJasa ? 'Jasa Servis' : 'Sparepart',
+                        subInfo: isJasa ? 'Ongkos Mekanik' : 'Stok Tersedia',
+                        price: price,
+                        isService: isJasa,
+                      ),
+                    );
+                  });
+                  Navigator.pop(ctx);
+                }
+              },
+              child: const Text('Tambahkan', style: TextStyle(color: textWhite)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditItemDialog(KasirItemModel item) {
+    final priceCtrl = TextEditingController(text: item.price.toString());
+    int qty = item.quantity;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: cardBorder),
+          ),
+          title: Text(
+            'Edit ${item.name}',
+            style: const TextStyle(color: textWhite, fontSize: 14, fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Harga Satuan (Rp)', style: TextStyle(color: textMuted, fontSize: 11)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: priceCtrl,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: accentGreen, fontSize: 13, fontWeight: FontWeight.bold),
+                decoration: _buildInputDecoration('', prefix: 'Rp '),
+              ),
+              const SizedBox(height: 14),
+              const Text('Jumlah (Qty)', style: TextStyle(color: textMuted, fontSize: 11)),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      if (qty > 1) setDialogState(() => qty--);
+                    },
+                    icon: const Icon(Icons.remove_circle_outline, color: textDim),
+                  ),
+                  Text('$qty', style: const TextStyle(color: textWhite, fontSize: 15, fontWeight: FontWeight.bold)),
+                  IconButton(
+                    onPressed: () => setDialogState(() => qty++),
+                    icon: const Icon(Icons.add_circle_outline, color: accentRed),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Batal', style: TextStyle(color: textDim)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentRed,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                final p = int.tryParse(priceCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? item.price;
+                setState(() {
+                  item.price = p;
+                  item.quantity = qty;
+                });
+                Navigator.pop(ctx);
+              },
+              child: const Text('Simpan', style: TextStyle(color: textWhite)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _handleProcessPayment() {
+    if (_items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFF3B1517),
+          content: Text('Daftar item transaksi masih kosong!'),
+        ),
+      );
+      return;
+    }
+
+    final kasirName = widget.userData?['nama_lengkap'] ?? 'Sri Ekowati';
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NotaPembayaranPage(
+          noNota: _trxCode,
+          waktu: '29/09/2026 • 10:45 WIB',
+          pelanggan: '$_customerName ($_policeNumber)',
+          kasir: kasirName,
+          items: _items,
+          totalBayar: _totalBayar,
+          tunaiDiterima: _paymentMethod == 'Tunai' ? 200000 : _totalBayar,
+          paymentMethod: _paymentMethod,
+          userData: widget.userData,
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration(String hint, {String? prefix}) {
+    return InputDecoration(
+      hintText: hint,
+      prefixText: prefix,
+      prefixStyle: const TextStyle(color: accentGreen, fontWeight: FontWeight.bold),
+      hintStyle: const TextStyle(color: textDim, fontSize: 12),
+      filled: true,
+      fillColor: bgDark,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: cardBorder),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: cardBorder),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: accentRed),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final kasirName = widget.userData?['nama_lengkap'] ?? 'Sri Ekowati';
+
+    return Scaffold(
+      backgroundColor: bgDark,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Header (Tombol Kembali, Judul, No TRX & Kasir)
+              _buildHeader(kasirName),
+              const SizedBox(height: 16),
+
+              // 2. Card Data Pelanggan & Motor
+              _buildDataPelangganCard(),
+              const SizedBox(height: 16),
+
+              // 3. Tab Jasa Servis & Pilih Dari History
+              _buildServiceSelectorSection(),
+              const SizedBox(height: 20),
+
+              // 4. Section Daftar Item Transaksi
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Daftar Item Transaksi',
+                    style: TextStyle(
+                      color: textWhite,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF191D2A),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: cardBorder, width: 1),
+                    ),
+                    child: Text(
+                      '${_items.length} Item',
+                      style: const TextStyle(
+                        color: textMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Daftar Item Cards
+              ..._items.map((item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _buildItemCard(item),
+                  )),
+
+              // Tombol Tambah Item Transaksi Lainnya
+              GestureDetector(
+                onTap: _showAddItemDialog,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF11141E),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: cardBorder, width: 1),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      '+ Tambah Item Transaksi Lainnya',
+                      style: TextStyle(
+                        color: textMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 5. Card Summary & Metode Pembayaran
+              _buildSummaryCard(),
+              const SizedBox(height: 16),
+
+              // 6. Tombol Besar Proses Pembayaran
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _handleProcessPayment,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentRed,
+                    foregroundColor: textWhite,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    'Proses Pembayaran (${_formatRupiah(_totalBayar)})',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(String kasirName) {
+    return Row(
+      children: [
+        GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: cardBg,
+              shape: BoxShape.circle,
+              border: Border.all(color: cardBorder, width: 1),
+            ),
+            child: const Icon(Icons.chevron_left_rounded, color: textWhite, size: 22),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Kasir & Transaksi',
+              style: TextStyle(
+                color: textWhite,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '$_trxCode • Kasir: $kasirName',
+              style: const TextStyle(
+                color: textMuted,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDataPelangganCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cardBorder, width: 1),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'DATA PELANGGAN & MOTOR',
+                style: TextStyle(
+                  color: textDim,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _customerName,
+                style: const TextStyle(
+                  color: textWhite,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$_vehicleInfo ($_policeNumber)',
+                style: const TextStyle(
+                  color: textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          GestureDetector(
+            onTap: _showEditCustomerDialog,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF142033),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF1E3A8A), width: 1),
+              ),
+              child: const Text(
+                'EDIT',
+                style: TextStyle(
+                  color: Color(0xFF60A5FA),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceSelectorSection() {
+    return Column(
+      children: [
+        // Tab Merah "Jasa Servis"
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: accentRed,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Center(
+            child: Text(
+              'Jasa Servis',
+              style: TextStyle(
+                color: textWhite,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Baris "Pilih dari history" & Tombol "+ Tambah"
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: cardBorder, width: 1),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: const [
+                    Text(
+                      'Pilih dari history',
+                      style: TextStyle(color: textDim, fontSize: 11),
+                    ),
+                    Icon(Icons.keyboard_arrow_down_rounded, color: textDim, size: 18),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _showAddItemDialog,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: accentRed,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  '+ Tambah',
+                  style: TextStyle(
+                    color: textWhite,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildItemCard(KasirItemModel item) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cardBorder, width: 1),
+      ),
+      child: Row(
+        children: [
+          // Icon Box / Wrench
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFF161B26),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: item.isService
+                    ? accentOrange.withValues(alpha: 0.7)
+                    : accentBlue.withValues(alpha: 0.7),
+                width: 1.5,
+              ),
+            ),
+            child: Center(
+              child: Icon(
+                item.isService ? Icons.build_rounded : Icons.token_rounded,
+                color: item.isService ? accentOrange : accentBlue,
+                size: 20,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Detail Info Item
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name,
+                  style: const TextStyle(
+                    color: textWhite,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Kategori: ${item.category} • ${item.subInfo}',
+                  style: const TextStyle(
+                    color: textMuted,
+                    fontSize: 9.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatRupiah(item.total),
+                  style: const TextStyle(
+                    color: accentGreen,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Tombol Edit
+          GestureDetector(
+            onTap: () => _showEditItemDialog(item),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF142033),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF1E3A8A), width: 1),
+              ),
+              child: const Text(
+                'Edit',
+                style: TextStyle(
+                  color: Color(0xFF60A5FA),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Tombol Hapus (✕)
+          GestureDetector(
+            onTap: () {
+              setState(() => _items.remove(item));
+            },
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: const Color(0xFF281116),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF5A1E24), width: 1),
+              ),
+              child: const Center(
+                child: Text(
+                  '✕',
+                  style: TextStyle(color: accentRed, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cardBorder, width: 1),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Subtotal (${_items.length} item)',
+                style: const TextStyle(color: textMuted, fontSize: 11),
+              ),
+              Text(
+                _formatRupiah(_totalBayar),
+                style: const TextStyle(color: textWhite, fontSize: 11.5, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Total Bayar',
+                style: TextStyle(color: textWhite, fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                _formatRupiah(_totalBayar),
+                style: const TextStyle(
+                  color: accentGreen,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Toggle Metode Pembayaran
+          Row(
+            children: [
+              // Tunai (Cash)
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _paymentMethod = 'Tunai'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    decoration: BoxDecoration(
+                      color: _paymentMethod == 'Tunai' ? accentRed : const Color(0xFF101420),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _paymentMethod == 'Tunai' ? accentRed : cardBorder,
+                        width: 1,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Tunai (Cash)',
+                        style: TextStyle(
+                          color: _paymentMethod == 'Tunai' ? textWhite : textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // QRIS / Transfer
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _paymentMethod = 'QRIS'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    decoration: BoxDecoration(
+                      color: _paymentMethod == 'QRIS' ? accentRed : const Color(0xFF101420),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _paymentMethod == 'QRIS' ? accentRed : cardBorder,
+                        width: 1,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'QRIS / Transfer',
+                        style: TextStyle(
+                          color: _paymentMethod == 'QRIS' ? textWhite : textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../components/moto_bottom_nav.dart';
+import 'kasir_transaksi.dart';
+import 'nota_pembayaran.dart';
 
 /// Screen 12 - (FR07) Riwayat Transaksi & Kasir
 class RiwayatTransaksiPage extends StatefulWidget {
@@ -152,104 +154,135 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
                   final trx = filtered[index];
                   final isQris = trx['payment'] == 'QRIS';
 
-                  return Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: cardBorder, width: 1),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Baris 1: Kode TRX, Badge Payment, Nominal Hijau
-                        Row(
-                          children: [
-                            Text(
-                              '${trx['code']} • ${trx['time']}',
-                              style: const TextStyle(
-                                color: textDim,
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w600,
+                  return InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => NotaPembayaranPage(
+                            noNota: trx['code'],
+                            waktu: trx['time'],
+                            pelanggan: '${trx['customer']} (${trx['vehicle']})',
+                            kasir: widget.userData?['nama_lengkap'] ?? 'Sri Ekowati',
+                            items: [
+                              KasirItemModel(
+                                id: '1',
+                                name: trx['service'],
+                                category: 'Layanan Servis',
+                                subInfo: 'Transaksi Kasir',
+                                price: int.tryParse(trx['amount'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+                                quantity: 1,
+                                isService: true,
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: isQris
-                                    ? const Color(0xFF0C243B)
-                                    : const Color(0xFF0F2E1E),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: isQris ? const Color(0xFF1E40AF) : const Color(0xFF166534),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Text(
-                                trx['payment'],
-                                style: TextStyle(
-                                  color: isQris ? accentBlue : accentGreen,
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              trx['amount'],
-                              style: const TextStyle(
-                                color: accentGreen,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Baris 2: Pelanggan & Motor
-                        Text(
-                          '${trx['customer']} • ${trx['vehicle']}',
-                          style: const TextStyle(
-                            color: textWhite,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
+                            ],
+                            totalBayar: int.tryParse(trx['amount'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+                            tunaiDiterima: int.tryParse(trx['amount'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+                            paymentMethod: trx['payment'] == 'QRIS' ? 'QRIS' : 'Tunai',
+                            userData: widget.userData,
                           ),
                         ),
-                        const SizedBox(height: 5),
-
-                        // Baris 3: Layanan Servis & Tombol Lingkaran Chevron
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                trx['service'],
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: cardBorder, width: 1),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Baris 1: Kode TRX, Badge Payment, Nominal Hijau
+                          Row(
+                            children: [
+                              Text(
+                                '${trx['code']} • ${trx['time']}',
                                 style: const TextStyle(
-                                  color: textMuted,
-                                  fontSize: 11,
+                                  color: textDim,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isQris
+                                      ? const Color(0xFF0C243B)
+                                      : const Color(0xFF0F2E1E),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: isQris ? const Color(0xFF1E40AF) : const Color(0xFF166534),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  trx['payment'],
+                                  style: TextStyle(
+                                    color: isQris ? accentBlue : accentGreen,
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                trx['amount'],
+                                style: const TextStyle(
+                                  color: accentGreen,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Baris 2: Pelanggan & Motor
+                          Text(
+                            '${trx['customer']} • ${trx['vehicle']}',
+                            style: const TextStyle(
+                              color: textWhite,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF1D2333),
-                                shape: BoxShape.circle,
+                          ),
+                          const SizedBox(height: 5),
+
+                          // Baris 3: Layanan Servis & Tombol Lingkaran Chevron
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  trx['service'],
+                                  style: const TextStyle(
+                                    color: textMuted,
+                                    fontSize: 11,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.chevron_right_rounded,
-                                color: textMuted,
-                                size: 16,
+                              const SizedBox(width: 8),
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF1D2333),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: textMuted,
+                                  size: 16,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -264,7 +297,14 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
                 height: 48,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    _showTambahTransaksiDialog();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => KasirTransaksiPage(
+                          userData: widget.userData,
+                        ),
+                      ),
+                    );
                   },
                   icon: const Icon(Icons.add, color: textWhite, size: 20),
                   label: const Text(
@@ -294,74 +334,6 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
               userData: widget.userData,
             )
           : null,
-    );
-  }
-
-  void _showTambahTransaksiDialog() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        side: BorderSide(color: cardBorder),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: textDim.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Input Transaksi Kasir Baru',
-              style: TextStyle(
-                color: textWhite,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Pilih jenis pembayaran, pelanggan, dan input nota.',
-              style: TextStyle(color: textMuted, fontSize: 12),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      backgroundColor: Color(0xFF143322),
-                      content: Text('Form kasir baru siap digunakan!'),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: accentRed,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                child: const Text('Buka Form Kasir',
-                    style: TextStyle(color: textWhite, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
