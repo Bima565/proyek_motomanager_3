@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../components/moto_bottom_nav.dart';
+import 'rincian_omzet_6bulan.dart';
+import 'rincian_transaksi_harian.dart';
 
 /// Screen 7 - (FR09) Laporan Pendapatan & Analitik Bengkel
 class LaporanPendapatanPage extends StatefulWidget {
@@ -25,7 +27,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
   static const Color accentRed = Color(0xFFFF1E27);
   static const Color accentBlue = Color(0xFF38BDF8);
   static const Color accentGreen = Color(0xFF22C55E);
-  static const Color accentYellow = Color(0xFFEAB308);
+  static const Color accentYellow = Color(0xFFFBBF24);
   static const Color textWhite = Color(0xFFFFFFFF);
   static const Color textMuted = Color(0xFF94A3B8);
   static const Color textDim = Color(0xFF6B7280);
@@ -85,23 +87,27 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
               ),
               const SizedBox(height: 18),
 
-              // 2. Card Total Omzet Bulanan (Cyan Box Penpot)
+              // 2. Card Total Omzet Bulanan (dengan Laba Kotor & Laba Bersih Net)
               _buildTotalOmzetCard(),
               const SizedBox(height: 16),
 
-              // 3. Card Sumber Pendapatan (Donut Chart Penpot)
+              // 3. Card Rincian Kalkulasi Laba & HPP (Real Harga Jual - Modal Part + Jasa)
+              _buildRincianKalkulasiCard(),
+              const SizedBox(height: 16),
+
+              // 4. Card Sumber Pendapatan (Donut Chart Penpot)
               _buildSumberPendapatanCard(),
               const SizedBox(height: 16),
 
-              // 4. Card Grafik Pendapatan Minggu Ini (Dual Bar Chart)
+              // 5. Card Grafik Pendapatan Minggu Ini (Dual Bar Chart)
               _buildGrafikMingguanCard(),
               const SizedBox(height: 16),
 
-              // 5. Card Tren Omzet Bulanan (6 Bulan Line Chart)
+              // 6. Card Tren Omzet Bulanan (6 Bulan Line Chart)
               _buildTrenOmzetCard(),
               const SizedBox(height: 16),
 
-              // 6. Card Ekspor Dokumen Laporan (PDF & WhatsApp)
+              // 7. Card Ekspor Dokumen Laporan (PDF & WhatsApp)
               _buildEksporDokumenCard(),
             ],
           ),
@@ -116,12 +122,12 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
     );
   }
 
-  // --- KOMPONEN KARTU-KARTU PENPOT ---
+  // --- KOMPONEN KARTU-KARTU PENPOT SCREEN 7 ---
 
   Widget _buildTotalOmzetCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
@@ -133,34 +139,407 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
             'TOTAL OMZET BULANAN',
             style: TextStyle(
               color: textDim,
-              fontSize: 10.5,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.8,
             ),
           ),
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0D1826),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: accentBlue, width: 1.5),
+          const SizedBox(height: 8),
+          const Text(
+            'Rp 2.750.000',
+            style: TextStyle(
+              color: textWhite,
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
             ),
-            child: const Center(
-              child: Text(
-                'Rp 2.750.000',
-                style: TextStyle(
-                  color: textWhite,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
+          ),
+          const SizedBox(height: 18),
+
+          // Divider pemisah horizontal
+          Container(
+            height: 1,
+            color: cardBorder,
+          ),
+          const SizedBox(height: 16),
+
+          // Row Laba Kotor & Laba Bersih
+          Row(
+            children: [
+              // Kolom Kiri: Laba Kotor
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'LABA KOTOR',
+                      style: TextStyle(
+                        color: textMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Rp 1.700.000',
+                      style: TextStyle(
+                        color: textWhite,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F2538),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF1E3A5F), width: 1),
+                      ),
+                      child: const Text(
+                        'Margin 61.8%',
+                        style: TextStyle(
+                          color: Color(0xFF38BDF8),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+
+              // Garis pemisah vertikal
+              Container(
+                width: 1,
+                height: 52,
+                color: cardBorder,
+              ),
+              const SizedBox(width: 16),
+
+              // Kolom Kanan: Laba Bersih (Net)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'LABA BERSIH (NET)',
+                      style: TextStyle(
+                        color: accentGreen,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Rp 1.350.000',
+                      style: TextStyle(
+                        color: accentGreen,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0E291C),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF166534), width: 1),
+                      ),
+                      child: const Text(
+                        'Margin 49.1%',
+                        style: TextStyle(
+                          color: accentGreen,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRincianKalkulasiCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cardBorder, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row: Judul & Badge Transparan
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Rincian Kalkulasi Laba & HPP',
+                style: TextStyle(
+                  color: textWhite,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E2330),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'Transparan',
+                  style: TextStyle(
+                    color: textMuted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          const Text(
+            'Hitungan Real Harga Jual - Modal Beli Part + Jasa',
+            style: TextStyle(
+              color: textDim,
+              fontSize: 10.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Bagian 1: Penjualan Sparepart (26 pcs)
+          const Text(
+            '• Penjualan Sparepart (26 pcs)',
+            style: TextStyle(
+              color: Color(0xFF38BDF8),
+              fontSize: 11.5,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          _buildCalcRow('• Total Harga Jual:', 'Rp 1.510.000', textMuted, textWhite),
+          const SizedBox(height: 4),
+          _buildCalcRow(
+            '• Modal Beli Toko (HPP):',
+            '- Rp 1.050.000',
+            const Color(0xFFFF5252),
+            const Color(0xFFFF5252),
+          ),
+          const SizedBox(height: 4),
+          _buildCalcRow(
+            '= Margin Part (Jual - Beli):',
+            '+ Rp 460.000 (30.5%)',
+            const Color(0xFF38BDF8),
+            const Color(0xFF38BDF8),
+          ),
+          const SizedBox(height: 14),
+
+          // Bagian 2: Jasa Servis Motor (38 servis)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    '• Jasa Servis Motor (38 servis)',
+                    style: TextStyle(
+                      color: Color(0xFFFF1E27),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    '100% Laba Jasa (Tanpa modal part)',
+                    style: TextStyle(
+                      color: textDim,
+                      fontSize: 9.5,
+                    ),
+                  ),
+                ],
+              ),
+              const Text(
+                '+ Rp 1.240.000',
+                style: TextStyle(
+                  color: accentGreen,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Box LABA KOTOR BENGKEL (Border Biru)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0C1726),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF1E3A8A), width: 1.2),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'LABA KOTOR BENGKEL',
+                      style: TextStyle(
+                        color: textWhite,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Untung Part (460rb) + Jasa (1.240rb)',
+                      style: TextStyle(
+                        color: textDim,
+                        fontSize: 9.5,
+                      ),
+                    ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: const [
+                    Text(
+                      'Rp 1.700.000',
+                      style: TextStyle(
+                        color: Color(0xFF38BDF8),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Margin 61.8%',
+                      style: TextStyle(
+                        color: Color(0xFF38BDF8),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Beban Operasional
+          _buildCalcRow(
+            'Beban Operasional (Listrik, Wifi, Konsumsi)',
+            '- Rp 350.000',
+            textMuted,
+            const Color(0xFFFF5252),
+          ),
+          const SizedBox(height: 12),
+
+          // Box LABA BERSIH (NET PROFIT) (Border Hijau)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF092015),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF15803D), width: 1.2),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'LABA BERSIH (NET PROFIT)',
+                      style: TextStyle(
+                        color: textWhite,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Laba Kotor - Beban Operasional',
+                      style: TextStyle(
+                        color: accentGreen,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: const [
+                    Text(
+                      'Rp 1.350.000',
+                      style: TextStyle(
+                        color: accentGreen,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Kas Bersih (Margin 49.1%)',
+                      style: TextStyle(
+                        color: accentGreen,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCalcRow(String label, String value, Color labelColor, Color valueColor) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: labelColor,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: valueColor,
+            fontSize: 11.5,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 
@@ -228,7 +607,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Jasa Servis
+                    // Jasa Servis (Square Box Red)
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -236,9 +615,9 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                           margin: const EdgeInsets.only(top: 4),
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             color: accentRed,
-                            shape: BoxShape.circle,
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -266,7 +645,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Sparepart
+                    // Sparepart (Square Box Blue)
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -274,9 +653,9 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                           margin: const EdgeInsets.only(top: 4),
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             color: accentBlue,
-                            shape: BoxShape.circle,
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -336,19 +715,31 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF281116),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF5A1E24)),
-                ),
-                child: const Text(
-                  'Detail ›',
-                  style: TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => RincianTransaksiHarianPage(
+                        userData: widget.userData,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF281116),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF5A1E24)),
+                  ),
+                  child: const Text(
+                    'Detail ›',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -378,8 +769,8 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                 _buildBarCol('Rab', '80k', 0.60, 0.55, false),
                 _buildBarCol('Kam', '95k', 0.70, 0.65, false),
                 _buildBarCol('Jum', '90k', 0.68, 0.60, false),
-                _buildBarCol('Sab', '140k', 1.0, 0.90, true),
-                _buildBarCol('Min', '110k', 0.80, 0.75, false),
+                _buildBarCol('Sab', '140k', 1.0, 0.85, true),
+                _buildBarCol('Min', '110k', 0.78, 0.72, false),
               ],
             ),
           ),
@@ -480,19 +871,31 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF281116),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF5A1E24)),
-                ),
-                child: const Text(
-                  'Detail ›',
-                  style: TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => RincianOmzet6BulanPage(
+                        userData: widget.userData,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF281116),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF5A1E24)),
+                  ),
+                  child: const Text(
+                    'Detail ›',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -534,7 +937,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF4A1A22), width: 1.2),
+        border: Border.all(color: accentRed, width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -685,10 +1088,10 @@ class _DonutChartPainter extends CustomPainter {
 class _TrenOmzetPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final values = [1.35, 2.48, 2.80, 2.42, 2.58, 2.75];
-    final labels = ['1,35 Jt', '2,48 Jt', '2,80 Jt', '2,42 Jt', '2,58 Jt', '2,75 Jt'];
-    final minVal = 1.0;
-    final maxVal = 3.2;
+    final values = [2.35, 2.48, 2.60, 2.42, 2.55, 2.75];
+    final labels = ['2,35 Jt', '2,48 Jt', '2,60 Jt', '2,42 Jt', '2,55 Jt', '2,75 Jt'];
+    final minVal = 2.0;
+    final maxVal = 2.9;
 
     final points = <Offset>[];
     final stepX = size.width / (values.length - 1);
@@ -737,18 +1140,28 @@ class _TrenOmzetPainter extends CustomPainter {
       final p = points[i];
       final isLast = i == points.length - 1;
 
-      // Titik Marker
-      final dotPaint = Paint()
-        ..color = isLast ? const Color(0xFF22C55E) : const Color(0xFFFF1E27);
-      canvas.drawCircle(p, isLast ? 4 : 3, dotPaint);
+      if (isLast) {
+        // Target dot ring hijau untuk Sep
+        final outerDotPaint = Paint()
+          ..color = const Color(0xFF22C55E)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2;
+        final innerDotPaint = Paint()..color = const Color(0xFF0E1015);
+        canvas.drawCircle(p, 5, innerDotPaint);
+        canvas.drawCircle(p, 5, outerDotPaint);
+      } else {
+        // Dot merah untuk bulan-bulan sebelumnya
+        final dotPaint = Paint()..color = const Color(0xFFFF1E27);
+        canvas.drawCircle(p, 3.5, dotPaint);
+      }
 
       // Label teks di atas titik
       final textSpan = TextSpan(
         text: labels[i],
         style: TextStyle(
-          color: isLast ? const Color(0xFF22C55E) : const Color(0xFF94A3B8),
-          fontSize: 7.5,
-          fontWeight: isLast ? FontWeight.bold : FontWeight.w600,
+          color: isLast ? const Color(0xFF22C55E) : Colors.white,
+          fontSize: 8,
+          fontWeight: isLast ? FontWeight.w800 : FontWeight.w600,
         ),
       );
       final textPainter = TextPainter(
@@ -757,7 +1170,7 @@ class _TrenOmzetPainter extends CustomPainter {
       )..layout();
       textPainter.paint(
         canvas,
-        Offset(p.dx - textPainter.width / 2, p.dy - 12),
+        Offset(p.dx - textPainter.width / 2, p.dy - 14),
       );
     }
   }
