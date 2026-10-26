@@ -414,6 +414,44 @@ class AuthService {
     }
   }
 
+  /// 5b. UPDATE EMAIL USER DI FIREBASE AUTH & FIRESTORE
+  Future<void> updateUserEmail(String newEmail) async {
+    final user = _auth.currentUser;
+    final cleanEmail = newEmail.trim().toLowerCase();
+    final oldEmail = user?.email;
+
+    if (user != null) {
+      try {
+        await user.verifyBeforeUpdateEmail(cleanEmail);
+      } catch (e) {
+        debugPrint('Notice on verifyBeforeUpdateEmail: $e');
+      }
+    }
+
+    final updateData = <String, dynamic>{
+      'email': cleanEmail,
+      'updated_at': FieldValue.serverTimestamp(),
+    };
+
+    if (user != null) {
+      await _firestore
+          .collection('user')
+          .doc(user.uid)
+          .set(updateData, SetOptions(merge: true));
+    }
+
+    if (oldEmail != null && oldEmail.isNotEmpty) {
+      final querySnapshot = await _firestore
+          .collection('user')
+          .where('email', isEqualTo: oldEmail)
+          .get();
+
+      for (final doc in querySnapshot.docs) {
+        await doc.reference.set(updateData, SetOptions(merge: true));
+      }
+    }
+  }
+
   /// 6. STREAM DAFTAR SEMUA USER DARI FIRESTORE
   Stream<List<Map<String, dynamic>>> streamUsers() {
     return _firestore.collection('user').snapshots().map((snapshot) {

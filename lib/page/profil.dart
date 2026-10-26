@@ -99,6 +99,134 @@ class _ProfilPageState extends State<ProfilPage> {
     }
   }
 
+  void _showChangeEmailDialog(String currentEmail) {
+    final emailController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: cardBorder),
+          ),
+          title: const Text('Ganti Email Akun',
+              style: TextStyle(color: textWhite, fontSize: 16, fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Email Saat Ini', style: TextStyle(color: textMuted, fontSize: 12)),
+              const SizedBox(height: 4),
+              Text(
+                currentEmail,
+                style: const TextStyle(color: textDim, fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              const Text('Email Baru', style: TextStyle(color: textMuted, fontSize: 12)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: emailController,
+                style: const TextStyle(color: textWhite),
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  hintText: 'user@motomanage.id',
+                  hintStyle: const TextStyle(color: textDim),
+                  filled: true,
+                  fillColor: bgDark,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: cardBorder),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(ctx),
+              child: const Text('Batal', style: TextStyle(color: textDim)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentRed,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      final newEmail = emailController.text.trim();
+                      if (newEmail.isEmpty || !newEmail.contains('@')) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            backgroundColor: Color(0xFF3B1517),
+                            content: Text('Masukkan alamat email yang valid!'),
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (newEmail.toLowerCase() == currentEmail.toLowerCase()) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            backgroundColor: Color(0xFF3B1517),
+                            content: Text('Email baru sama dengan email saat ini!'),
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => isLoading = true);
+                      try {
+                        await _authService.updateUserEmail(newEmail);
+
+                        if (mounted) {
+                          setState(() {
+                            if (_liveUserData != null) {
+                              _liveUserData!['email'] = newEmail;
+                            }
+                            if (widget.userData != null) {
+                              widget.userData!['email'] = newEmail;
+                            }
+                          });
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              backgroundColor: Color(0xFF143322),
+                              content: Text('Email berhasil diperbarui di database Firebase!'),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setDialogState(() => isLoading = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: const Color(0xFF3B1517),
+                              content: Text('Gagal memperbarui email: $e'),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Simpan', style: TextStyle(color: textWhite)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showEditProfileDialog(
       String currentName, String currentEmail, String currentPhone) {
     final nameController = TextEditingController(text: currentName);
@@ -724,6 +852,11 @@ class _ProfilPageState extends State<ProfilPage> {
               _buildActionMenuItem(
                 title: 'Ubah Data Diri & Nomor Telepon',
                 onTap: () => _showEditProfileDialog(username, email, phone),
+              ),
+              const SizedBox(height: 10),
+              _buildActionMenuItem(
+                title: 'Ganti Email Akun',
+                onTap: () => _showChangeEmailDialog(email),
               ),
               const SizedBox(height: 10),
               _buildActionMenuItem(
