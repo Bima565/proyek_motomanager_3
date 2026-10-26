@@ -69,7 +69,9 @@ class _BerandaPageState extends State<BerandaPage> {
   }
 
   void _checkPasswordStatus() async {
-    final hasPass = await _authService.userHasPassword();
+    final bool initialDocHasPass = widget.userData?['has_password'] == true;
+    final bool isDocExplicitlyNoPass = widget.userData?['has_password'] == false;
+    final bool hasPass = !isDocExplicitlyNoPass && (initialDocHasPass || await _authService.userHasPassword());
     if (!hasPass && mounted) {
       final email = _liveUserData?['email'] ??
           widget.userData?['email'] ??

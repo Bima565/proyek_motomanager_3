@@ -82,6 +82,9 @@ class AuthService {
 
       if (user == null) return null;
 
+      final bool isNewAuth =
+          userCredential.additionalUserInfo?.isNewUser ?? false;
+
       try {
         // 1. Cek langsung dengan UID Firebase Auth
         final userDoc =
@@ -89,13 +92,18 @@ class AuthService {
         if (userDoc.exists && userDoc.data() != null) {
           final data = userDoc.data()!;
           data['id'] = userDoc.id;
+          if (isNewAuth || data['has_password'] != true) {
+            data['has_password'] = false;
+            data['is_new_user'] = true;
+          }
           return data;
         }
 
         // 2. Cek apakah akun email ini sudah terdaftar di koleksi 'user' Firestore
+        final cleanEmail = (user.email ?? '').trim().toLowerCase();
         final querySnapshot = await _firestore
             .collection('user')
-            .where('email', isEqualTo: user.email)
+            .where('email', isEqualTo: cleanEmail)
             .limit(1)
             .get();
 
@@ -104,15 +112,20 @@ class AuthService {
           final existingDoc = querySnapshot.docs.first;
           final data = existingDoc.data();
           data['id'] = existingDoc.id;
+          if (isNewAuth || data['has_password'] != true) {
+            data['has_password'] = false;
+            data['is_new_user'] = true;
+          }
           return data;
         } else {
           // Pengguna baru pertama kali login Google -> Daftarkan otomatis ke Firestore
           final newUserData = <String, dynamic>{
             'nama_lengkap': user.displayName ?? 'Pengguna Google',
-            'email': user.email ?? '',
+            'email': cleanEmail,
             'no_telepon': user.phoneNumber ?? '',
             'role': 'Kasir', // Role default untuk user baru
             'status': true,
+            'has_password': false, // Wajib false untuk akun baru
             'created_at': FieldValue.serverTimestamp(),
             'updated_at': FieldValue.serverTimestamp(),
           };
@@ -120,17 +133,21 @@ class AuthService {
           // Simpan dokumen baru dengan UID Firebase Auth sebagai document ID
           await _firestore.collection('user').doc(user.uid).set(newUserData);
           newUserData['id'] = user.uid;
+          newUserData['has_password'] = false;
+          newUserData['is_new_user'] = true;
           return newUserData;
         }
       } catch (firestoreError) {
-        // Fallback jika Firestore terkendala, tetap izinkan login ke dashboard
+        // Fallback jika Firestore terkendala
         return <String, dynamic>{
           'id': user.uid,
           'nama_lengkap': user.displayName ?? 'Pengguna Google',
-          'email': user.email ?? '',
+          'email': (user.email ?? '').trim().toLowerCase(),
           'no_telepon': user.phoneNumber ?? '',
           'role': 'Kasir',
           'status': true,
+          'has_password': false,
+          'is_new_user': true,
         };
       }
     } on GoogleSignInException catch (e) {
@@ -169,11 +186,17 @@ class AuthService {
     final User? user = credential.user;
     if (user == null) return null;
 
+    final cleanName = namaLengkap.trim();
+    final cleanEmail = (user.email ?? email.trim()).toLowerCase();
+    try {
+      await user.updateDisplayName(cleanName);
+    } catch (_) {}
+
     // Simpan ke Firestore di koleksi 'user'
     final userData = <String, dynamic>{
-      'nama_lengkap': namaLengkap,
-      'email': user.email ?? email.trim(),
-      'no_telepon': noTelepon,
+      'nama_lengkap': cleanName,
+      'email': cleanEmail,
+      'no_telepon': noTelepon.trim(),
       'role': role,
       'status': true,
       'has_password': true,
@@ -247,14 +270,30 @@ class AuthService {
     final user = _auth.currentUser;
     if (user == null) return false;
 
-    // Cek apakah provider 'password' sudah terdaftar di Firebase Auth
+    // 1. Cek apakah provider 'password' sudah terdaftar di Firebase Auth
     final hasProvider =
         user.providerData.any((p) => p.providerId == 'password');
     if (hasProvider) return true;
 
-    // Cek juga di dokumen Firestore
-    final profile = await getUserProfileByEmail(user.email ?? '');
-    return profile?['has_password'] == true;
+    // 2. Cek di dokumen Firestore berdasarkan UID
+    try {
+      final userDoc = await _firestore.collection('user').doc(user.uid).get();
+      if (userDoc.exists && userDoc.data() != null) {
+        final data = userDoc.data()!;
+        if (data['has_password'] == true) return true;
+        if (data['has_password'] == false) return false;
+      }
+    } catch (e) {
+      debugPrint('Error checking user doc for password: $e');
+    }
+
+    // 3. Fallback cek di dokumen Firestore berdasarkan email
+    try {
+      final profile = await getUserProfileByEmail(user.email ?? '');
+      return profile?['has_password'] == true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// 4. SET / UPDATE PASSWORD UNTUK AKUN LOGIN GOOGLE / NATIVE
@@ -295,10 +334,10 @@ class AuthService {
       debugPrint('Password update exception: $e');
     }
 
-    // 2. Simpan status dan password ke Firestore
+    // 2. Simpan status ke Firestore (password hanya disimpan aman di Firebase Auth, bukan Firestore)
     final updateData = <String, dynamic>{
       'has_password': true,
-      'password': newPassword,
+      'password': FieldValue.delete(), // Hapus field password plain-text jika sebelumnya ada
       'updated_at': FieldValue.serverTimestamp(),
     };
 
@@ -328,7 +367,6 @@ class AuthService {
         'role': 'Kasir',
         'status': true,
         'has_password': true,
-        'password': newPassword,
         'created_at': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -405,7 +443,6 @@ class AuthService {
       'no_telepon': (noTelepon ?? '').trim(),
       'status': true,
       'has_password': password != null && password.isNotEmpty,
-      if (password != null && password.isNotEmpty) 'password': password,
       'created_at': FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
     };

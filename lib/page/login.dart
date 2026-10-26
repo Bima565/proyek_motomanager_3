@@ -17,10 +17,15 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _emailController;
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _nameRegisterController = TextEditingController();
+  final TextEditingController _phoneRegisterController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
 
   final AuthService _authService = AuthService();
 
+  bool _isRegisterMode = false;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   bool _isLoading = false;
 
   // Warna Design System Penpot MotoManage
@@ -36,7 +41,7 @@ class _LoginPageState extends State<LoginPage> {
   void initState() {
     super.initState();
     _emailController = TextEditingController(
-      text: widget.initialEmail ?? 'sugeng@gmail.com',
+      text: widget.initialEmail ?? 'example@gmail.com',
     );
   }
 
@@ -44,6 +49,9 @@ class _LoginPageState extends State<LoginPage> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _nameRegisterController.dispose();
+    _phoneRegisterController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -154,6 +162,137 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  void _handleRegister() async {
+    if (_formKey.currentState!.validate()) {
+      if (_passwordController.text != _confirmPasswordController.text) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF3B1517),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: accentRed, width: 1),
+            ),
+            content: const Row(
+              children: [
+                Icon(Icons.error_outline_rounded, color: accentRed),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Konfirmasi kata sandi tidak cocok.',
+                    style: TextStyle(color: textWhite),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        return;
+      }
+
+      setState(() => _isLoading = true);
+
+      try {
+        final userData = await _authService.registerWithEmailPassword(
+          email: _emailController.text,
+          password: _passwordController.text,
+          namaLengkap: _nameRegisterController.text,
+          noTelepon: _phoneRegisterController.text,
+        );
+
+        if (!mounted) return;
+
+        if (userData != null) {
+          final nama = userData['nama_lengkap'] ?? _nameRegisterController.text;
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFF143322),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: Color(0xFF22C55E), width: 1),
+              ),
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle_outline, color: Color(0xFF22C55E)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Pendaftaran berhasil! Selamat datang, $nama',
+                      style: const TextStyle(
+                        color: textWhite,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => BerandaPage(userData: userData),
+            ),
+          );
+        }
+      } on FirebaseAuthException catch (e) {
+        if (!mounted) return;
+        String errorMessage = 'Pendaftaran gagal.';
+        if (e.code == 'email-already-in-use') {
+          errorMessage = 'Email ini sudah terdaftar. Silakan masuk.';
+        } else if (e.code == 'weak-password') {
+          errorMessage = 'Kata sandi terlalu lemah.';
+        } else if (e.code == 'invalid-email') {
+          errorMessage = 'Format email tidak valid.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF3B1517),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: accentRed, width: 1),
+            ),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: accentRed),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    errorMessage,
+                    style: const TextStyle(color: textWhite),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF3B1517),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: accentRed, width: 1),
+            ),
+            content: Text(
+              'Gagal mendaftar: $e',
+              style: const TextStyle(color: textWhite),
+            ),
+          ),
+        );
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    }
+  }
+
   void _handleGoogleLogin() async {
     setState(() => _isLoading = true);
 
@@ -166,12 +305,14 @@ class _LoginPageState extends State<LoginPage> {
         final email =
             userData['email'] ?? _authService.currentUser?.email ?? '';
 
-        // Cek apakah akun baru / belum memiliki password native
-        final hasPassword = await _authService.userHasPassword();
+        final bool isNew = userData['is_new_user'] == true;
+        final bool hasDocPassword = userData['has_password'] == true;
+        final bool hasAuthPassword = await _authService.userHasPassword();
+        final bool needsPassword = isNew || !hasDocPassword || !hasAuthPassword;
 
         if (!mounted) return;
 
-        if (!hasPassword && email.isNotEmpty) {
+        if (needsPassword && email.isNotEmpty) {
           setState(() => _isLoading = false);
 
           final created = await CreatePasswordDialog.show(
@@ -183,7 +324,7 @@ class _LoginPageState extends State<LoginPage> {
           if (!mounted) return;
 
           if (created != true) {
-            // User membatalkan pembuatan password -> logout dan kembali ke login
+            // User membatalkan pembuatan password -> logout dan tetap di halaman login
             await _authService.signOut();
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
@@ -198,6 +339,8 @@ class _LoginPageState extends State<LoginPage> {
             );
             return;
           }
+
+          userData['has_password'] = true;
         }
 
         if (!mounted) return;
@@ -327,12 +470,82 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 38),
+                    const SizedBox(height: 32),
 
-                    // --- 2. HEADING (Masuk ke Akun) ---
-                    const Text(
-                      'Masuk ke Akun',
-                      style: TextStyle(
+                    // --- 2. SWITCH TAB MASUK / DAFTAR ---
+                    Container(
+                      height: 44,
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: inputBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: inputBorder),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                if (_isRegisterMode) {
+                                  setState(() {
+                                    _isRegisterMode = false;
+                                  });
+                                }
+                              },
+                              behavior: HitTestBehavior.opaque,
+                              child: Container(
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: !_isRegisterMode ? accentRed : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Masuk',
+                                  style: TextStyle(
+                                    color: !_isRegisterMode ? textWhite : textMuted,
+                                    fontSize: 13,
+                                    fontWeight: !_isRegisterMode ? FontWeight.bold : FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                if (!_isRegisterMode) {
+                                  setState(() {
+                                    _isRegisterMode = true;
+                                  });
+                                }
+                              },
+                              behavior: HitTestBehavior.opaque,
+                              child: Container(
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: _isRegisterMode ? accentRed : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Daftar Akun Baru',
+                                  style: TextStyle(
+                                    color: _isRegisterMode ? textWhite : textMuted,
+                                    fontSize: 13,
+                                    fontWeight: _isRegisterMode ? FontWeight.bold : FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // --- 3. HEADING ---
+                    Text(
+                      _isRegisterMode ? 'Daftar Akun Baru' : 'Masuk ke Akun',
+                      style: const TextStyle(
                         color: textWhite,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -340,17 +553,75 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
-                      'Silakan masukkan password akun bengkel Anda',
-                      style: TextStyle(
+                    Text(
+                      _isRegisterMode
+                          ? 'Daftarkan akun bengkel baru dengan kata sandi terverifikasi'
+                          : 'Silakan masukkan password akun bengkel Anda',
+                      style: const TextStyle(
                         color: textMuted,
                         fontSize: 13.5,
                         fontWeight: FontWeight.w400,
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
 
-                    // --- 3. INPUT EMAIL ---
+                    // --- 4. INPUT NAMA LENGKAP (KHUSUS REGISTER) ---
+                    if (_isRegisterMode) ...[
+                      const Text(
+                        'Nama Lengkap',
+                        style: TextStyle(
+                          color: textWhite,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _nameRegisterController,
+                        style: const TextStyle(color: textWhite, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: 'Contoh: Sugeng Santoso',
+                          hintStyle: const TextStyle(color: textDim, fontSize: 13.5),
+                          prefixIcon: const Icon(
+                            Icons.person_outline_rounded,
+                            color: textDim,
+                            size: 20,
+                          ),
+                          filled: true,
+                          fillColor: inputBg,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: inputBorder, width: 1),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: accentRed, width: 1.5),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.redAccent),
+                          ),
+                          focusedErrorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                const BorderSide(color: Colors.redAccent, width: 1.5),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Nama lengkap tidak boleh kosong';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+
+                    // --- 5. INPUT EMAIL ---
                     const Text(
                       'Email',
                       style: TextStyle(
@@ -400,12 +671,66 @@ class _LoginPageState extends State<LoginPage> {
                         if (value == null || value.trim().isEmpty) {
                           return 'Email tidak boleh kosong';
                         }
+                        if (!value.contains('@') || !value.contains('.')) {
+                          return 'Format email tidak valid';
+                        }
                         return null;
                       },
                     ),
                     const SizedBox(height: 18),
 
-                    // --- 4. INPUT KATA SANDI ---
+                    // --- 6. INPUT NO TELEPON (KHUSUS REGISTER) ---
+                    if (_isRegisterMode) ...[
+                      const Text(
+                        'No Telepon (WhatsApp)',
+                        style: TextStyle(
+                          color: textWhite,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _phoneRegisterController,
+                        style: const TextStyle(color: textWhite, fontSize: 14),
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          hintText: '081234567890',
+                          hintStyle: const TextStyle(color: textDim, fontSize: 13.5),
+                          prefixIcon: const Icon(
+                            Icons.phone_outlined,
+                            color: textDim,
+                            size: 20,
+                          ),
+                          filled: true,
+                          fillColor: inputBg,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: inputBorder, width: 1),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: accentRed, width: 1.5),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.redAccent),
+                          ),
+                          focusedErrorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                const BorderSide(color: Colors.redAccent, width: 1.5),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+
+                    // --- 7. INPUT KATA SANDI ---
                     const Text(
                       'Kata Sandi',
                       style: TextStyle(
@@ -472,56 +797,148 @@ class _LoginPageState extends State<LoginPage> {
                         if (value.length < 6) {
                           return 'Kata sandi minimal 6 karakter';
                         }
+                        if (_isRegisterMode) {
+                          if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                            return 'Harus memiliki huruf besar (A-Z)';
+                          }
+                          if (!RegExp(r'[a-z]').hasMatch(value)) {
+                            return 'Harus memiliki huruf kecil (a-z)';
+                          }
+                          if (!RegExp(r'[0-9]').hasMatch(value)) {
+                            return 'Harus memiliki angka (0-9)';
+                          }
+                        }
                         return null;
                       },
                     ),
-                    const SizedBox(height: 12),
 
-                    // --- 5. LUPA KATA SANDI? ---
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: GestureDetector(
-                        onTap: () async {
-                          final resetEmail = await PasswordForgetDialog.show(
-                            context,
-                            initialEmail: _emailController.text,
-                          );
-                          if (!mounted) return;
-                          if (resetEmail != null) {
-                            _emailController.text = resetEmail;
-                            _passwordController.clear();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                backgroundColor: Color(0xFF143322),
-                                behavior: SnackBarBehavior.floating,
-                                content: Text(
-                                  'Password berhasil diperbarui! Silakan masuk dengan password baru Anda.',
-                                ),
-                              ),
-                            );
+                    // --- 8. INPUT KONFIRMASI KATA SANDI (KHUSUS REGISTER) ---
+                    if (_isRegisterMode) ...[
+                      const SizedBox(height: 18),
+                      const Text(
+                        'Konfirmasi Kata Sandi',
+                        style: TextStyle(
+                          color: textWhite,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _confirmPasswordController,
+                        obscureText: _obscureConfirmPassword,
+                        style: const TextStyle(color: textWhite, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: '••••••••••',
+                          hintStyle: const TextStyle(color: textDim, fontSize: 16),
+                          prefixIcon: const Icon(
+                            Icons.lock_reset_rounded,
+                            color: textDim,
+                            size: 20,
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirmPassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                              color: textDim,
+                              size: 20,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscureConfirmPassword = !_obscureConfirmPassword;
+                              });
+                            },
+                          ),
+                          filled: true,
+                          fillColor: inputBg,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: inputBorder, width: 1),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: accentRed, width: 1.5),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.redAccent),
+                          ),
+                          focusedErrorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                const BorderSide(color: Colors.redAccent, width: 1.5),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Konfirmasi kata sandi tidak boleh kosong';
                           }
+                          if (value != _passwordController.text) {
+                            return 'Konfirmasi kata sandi tidak cocok';
+                          }
+                          return null;
                         },
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 4.0),
-                          child: Text(
-                            'Lupa kata sandi?',
-                            style: TextStyle(
-                              color: accentRed,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
+                      ),
+                    ],
+
+                    if (!_isRegisterMode) ...[
+                      const SizedBox(height: 12),
+                      // --- 9. LUPA KATA SANDI? ---
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(
+                          onTap: () async {
+                            final resetEmail = await PasswordForgetDialog.show(
+                              context,
+                              initialEmail: _emailController.text,
+                            );
+                            if (!mounted) return;
+                            if (resetEmail != null) {
+                              _emailController.text = resetEmail;
+                              _passwordController.clear();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    backgroundColor: Color(0xFF143322),
+                                    behavior: SnackBarBehavior.floating,
+                                    content: Text(
+                                      'Password berhasil diperbarui! Silakan masuk dengan password baru Anda.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 4.0),
+                            child: Text(
+                              'Lupa kata sandi?',
+                              style: TextStyle(
+                                color: accentRed,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
+
                     const SizedBox(height: 22),
 
-                    // --- 6. TOMBOL MASUK (Primary Button) ---
+                    // --- 10. TOMBOL AKSI UTAMA (Masuk / Daftar) ---
                     SizedBox(
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _handleLogin,
+                        onPressed: _isLoading
+                            ? null
+                            : (_isRegisterMode ? _handleRegister : _handleLogin),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: accentRed,
                           foregroundColor: textWhite,
@@ -541,18 +958,50 @@ class _LoginPageState extends State<LoginPage> {
                                       AlwaysStoppedAnimation<Color>(textWhite),
                                 ),
                               )
-                            : const Text(
-                                'Masuk',
-                                style: TextStyle(
+                            : Text(
+                                _isRegisterMode ? 'Daftar Akun' : 'Masuk',
+                                style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                       ),
                     ),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 24),
 
-                    // --- 7. DIVIDER "atau" ---
+                    // --- 11. LINK TOGGLE BAWAH ---
+                    Center(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isRegisterMode = !_isRegisterMode;
+                          });
+                        },
+                        child: Text.rich(
+                          TextSpan(
+                            text: _isRegisterMode
+                                ? 'Sudah memiliki akun? '
+                                : 'Belum memiliki akun? ',
+                            style: const TextStyle(
+                              color: textMuted,
+                              fontSize: 13,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: _isRegisterMode ? 'Masuk' : 'Daftar Sekarang',
+                                style: const TextStyle(
+                                  color: accentRed,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // --- 12. DIVIDER "atau" ---
                     const Row(
                       children: [
                         Expanded(
@@ -580,9 +1029,9 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
 
-                    // --- 8. TOMBOL LOGIN GOOGLE ---
+                    // --- 13. TOMBOL LOGIN GOOGLE ---
                     SizedBox(
                       width: double.infinity,
                       height: 50,
