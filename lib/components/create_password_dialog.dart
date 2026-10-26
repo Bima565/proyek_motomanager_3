@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../hooks/firebase_auth.dart';
 
@@ -32,11 +33,13 @@ class CreatePasswordDialog extends StatefulWidget {
 
 class _CreatePasswordDialogState extends State<CreatePasswordDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _currentPasswordController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
 
   final AuthService _authService = AuthService();
 
+  bool _obscureCurrentPassword = true;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
@@ -66,6 +69,7 @@ class _CreatePasswordDialogState extends State<CreatePasswordDialog> {
   @override
   void dispose() {
     _passwordController.removeListener(_validatePasswordRules);
+    _currentPasswordController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
     super.dispose();
@@ -88,6 +92,23 @@ class _CreatePasswordDialogState extends State<CreatePasswordDialog> {
   void _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (widget.isChangePassword) {
+      if (_currentPasswordController.text.trim().isEmpty) {
+        setState(() {
+          _errorMessage = 'Password saat ini wajib diisi.';
+        });
+        return;
+      }
+      if (_currentPasswordController.text.trim() ==
+          _passwordController.text.trim()) {
+        setState(() {
+          _errorMessage =
+              'Password baru tidak boleh sama dengan password saat ini.';
+        });
+        return;
+      }
+    }
+
     if (!_isPasswordValid) {
       setState(() {
         _errorMessage =
@@ -109,9 +130,27 @@ class _CreatePasswordDialogState extends State<CreatePasswordDialog> {
     });
 
     try {
-      await _authService.setAccountPassword(_passwordController.text.trim());
+      await _authService.setAccountPassword(
+        _passwordController.text.trim(),
+        currentPassword: widget.isChangePassword
+            ? _currentPasswordController.text.trim()
+            : null,
+      );
       if (mounted) {
         Navigator.of(context).pop(true);
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        String msg = 'Gagal menyimpan password: ${e.message}';
+        if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+          msg = 'Password saat ini / lama salah. Silakan periksa kembali.';
+        } else if (e.code == 'requires-recent-login') {
+          msg = 'Sesi telah kedaluwarsa. Silakan keluar dan login kembali.';
+        }
+        setState(() {
+          _isLoading = false;
+          _errorMessage = msg;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -229,16 +268,74 @@ class _CreatePasswordDialogState extends State<CreatePasswordDialog> {
 
                 Text(
                   widget.isChangePassword
-                      ? 'Masukkan password baru untuk akun Anda.'
+                      ? 'Masukkan password saat ini dan password baru untuk akun Anda.'
                       : 'Akun Google Anda perlu membuat password agar dapat login langsung dengan email & password native.',
                   style: const TextStyle(color: textMuted, fontSize: 13),
                 ),
                 const SizedBox(height: 18),
 
+                // Input Password Saat Ini (Khusus saat Ubah Password)
+                if (widget.isChangePassword) ...[
+                  const Text(
+                    'Password Saat Ini',
+                    style: TextStyle(
+                      color: textWhite,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _currentPasswordController,
+                    obscureText: _obscureCurrentPassword,
+                    style: const TextStyle(color: textWhite, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Masukkan password saat ini',
+                      hintStyle: const TextStyle(color: Color(0xFF6B7280), fontSize: 13),
+                      prefixIcon: const Icon(
+                        Icons.lock_clock_outlined,
+                        color: Color(0xFF6B7280),
+                        size: 20,
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureCurrentPassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          color: const Color(0xFF6B7280),
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          setState(() => _obscureCurrentPassword = !_obscureCurrentPassword);
+                        },
+                      ),
+                      filled: true,
+                      fillColor: inputBg,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: inputBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: accentRed, width: 1.5),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (widget.isChangePassword && (value == null || value.isEmpty)) {
+                        return 'Password saat ini tidak boleh kosong';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                ],
+
                 // Input Password Baru
-                const Text(
-                  'Password Baru',
-                  style: TextStyle(
+                Text(
+                  widget.isChangePassword ? 'Password Baru' : 'Password Baru',
+                  style: const TextStyle(
                     color: textWhite,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,

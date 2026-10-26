@@ -297,10 +297,22 @@ class AuthService {
   }
 
   /// 4. SET / UPDATE PASSWORD UNTUK AKUN LOGIN GOOGLE / NATIVE
-  Future<void> setAccountPassword(String newPassword) async {
+  Future<void> setAccountPassword(
+    String newPassword, {
+    String? currentPassword,
+  }) async {
     final user = _auth.currentUser;
     if (user == null || user.email == null) {
       throw Exception('Pengguna tidak sedang login');
+    }
+
+    // Jika ganti password dan ada password lama, verifikasi lewat reautentikasi Firebase
+    if (currentPassword != null && currentPassword.isNotEmpty) {
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      await user.reauthenticateWithCredential(credential);
     }
 
     // 1. Daftarkan / perbarui password di Firebase Auth jika memungkinkan
@@ -330,8 +342,10 @@ class AuthService {
       }
     } on FirebaseAuthException catch (e) {
       debugPrint('Firebase Auth password update notice: [${e.code}] ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('Password update exception: $e');
+      rethrow;
     }
 
     // 2. Simpan status ke Firestore (password hanya disimpan aman di Firebase Auth, bukan Firestore)

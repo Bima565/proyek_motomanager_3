@@ -93,7 +93,7 @@ class _ProfilPageState extends State<ProfilPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: Color(0xFF143322),
-          content: Text('Kata sandi berhasil diperbarui di database Firebase!'),
+          content: Text('Kata sandi akun Anda berhasil diperbarui!'),
         ),
       );
     }
