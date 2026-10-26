@@ -179,6 +179,258 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     );
   }
 
+  void _showPickFromHistorySheet() {
+    String selectedDay = 'Semua';
+    final historyItems = [
+      {
+        'name': 'Jasa Servis Lengkap + Tune Up',
+        'category': 'Jasa Servis',
+        'price': 80000,
+        'day': 'Sabtu',
+        'isService': true,
+        'subInfo': 'Ongkos Mekanik',
+      },
+      {
+        'name': 'Servis Ringan + Ganti Oli MPX2',
+        'category': 'Jasa Servis',
+        'price': 65000,
+        'day': 'Sabtu',
+        'isService': true,
+        'subInfo': 'Servis Rutin',
+      },
+      {
+        'name': 'Ganti Oli Gardan + Busi NGK',
+        'category': 'Sparepart',
+        'price': 45000,
+        'day': 'Jumat',
+        'isService': false,
+        'subInfo': 'Pelumas & Pengapian',
+      },
+      {
+        'name': 'Bersihkan Injektor & Throttle Body',
+        'category': 'Jasa Servis',
+        'price': 50000,
+        'day': 'Jumat',
+        'isService': true,
+        'subInfo': 'Injeksi System',
+      },
+      {
+        'name': 'Ganti Kampas Rem Belakang',
+        'category': 'Sparepart',
+        'price': 40000,
+        'day': 'Kamis',
+        'isService': false,
+        'subInfo': 'Pengereman',
+      },
+      {
+        'name': 'Tambal Tubeless + Cairan Ban',
+        'category': 'Jasa Servis',
+        'price': 35000,
+        'day': 'Rabu',
+        'isService': true,
+        'subInfo': 'Ban & Velg',
+      },
+      {
+        'name': 'Servis CVT + Ganti Roller',
+        'category': 'Jasa Servis',
+        'price': 90000,
+        'day': 'Selasa',
+        'isService': true,
+        'subInfo': 'Transmisi Otomatis',
+      },
+      {
+        'name': 'Stel Klep & Rantai Roda',
+        'category': 'Jasa Servis',
+        'price': 30000,
+        'day': 'Senin',
+        'isService': true,
+        'subInfo': 'Mesin',
+      },
+    ];
+
+    final days = ['Semua', 'Sabtu', 'Jumat', 'Kamis', 'Rabu', 'Selasa', 'Senin'];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final filtered = selectedDay == 'Semua'
+              ? historyItems
+              : historyItems.where((h) => h['day'] == selectedDay).toList();
+
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: cardBorder,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Pilih Layanan dari Riwayat',
+                      style: TextStyle(
+                        color: textWhite,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '${filtered.length} Tersedia',
+                      style: const TextStyle(
+                        color: accentGreen,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Bubble filter hari
+                SizedBox(
+                  height: 32,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: days.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final day = days[index];
+                      final isSelected = selectedDay == day;
+                      return GestureDetector(
+                        onTap: () => setSheetState(() => selectedDay = day),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isSelected ? accentRed : const Color(0xFF10131B),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isSelected ? accentRed : cardBorder,
+                            ),
+                          ),
+                          child: Text(
+                            day,
+                            style: TextStyle(
+                              color: isSelected ? textWhite : textMuted,
+                              fontSize: 11,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 280),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final item = filtered[index];
+                      final name = item['name'] as String;
+                      final category = item['category'] as String;
+                      final subInfo = item['subInfo'] as String;
+                      final price = item['price'] as int;
+                      final isService = item['isService'] as bool;
+                      final day = item['day'] as String;
+
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            _items.add(
+                              KasirItemModel(
+                                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                                name: name,
+                                category: category,
+                                subInfo: subInfo,
+                                price: price,
+                                isService: isService,
+                              ),
+                            );
+                          });
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: const Color(0xFF143322),
+                              content: Text('"$name" ditambahkan ke transaksi!'),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10131B),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: cardBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isService ? Icons.build_rounded : Icons.token_rounded,
+                                color: isService ? accentOrange : accentBlue,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      name,
+                                      style: const TextStyle(
+                                        color: textWhite,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      '$category • Hari $day',
+                                      style: const TextStyle(color: textDim, fontSize: 10),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                _formatRupiah(price),
+                                style: const TextStyle(
+                                  color: accentGreen,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _showAddItemDialog() {
     final nameCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
@@ -682,22 +934,25 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
         Row(
           children: [
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: cardBorder, width: 1),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text(
-                      'Pilih dari history',
-                      style: TextStyle(color: textDim, fontSize: 11),
-                    ),
-                    Icon(Icons.keyboard_arrow_down_rounded, color: textDim, size: 18),
-                  ],
+              child: GestureDetector(
+                onTap: _showPickFromHistorySheet,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: cardBorder, width: 1),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: const [
+                      Text(
+                        'Pilih dari history',
+                        style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.w500),
+                      ),
+                      Icon(Icons.keyboard_arrow_down_rounded, color: textDim, size: 18),
+                    ],
+                  ),
                 ),
               ),
             ),
