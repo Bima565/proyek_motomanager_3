@@ -429,7 +429,7 @@ class AuthService {
   Future<void> addNewUser({
     required String namaLengkap,
     required String email,
-    required String role,
+    String role = 'Kasir',
     String? password,
     String? noTelepon,
   }) async {
@@ -455,14 +455,25 @@ class AuthService {
     required String docId,
     required String namaLengkap,
     required String email,
-    required String role,
+    String? role,
+    String? noTelepon,
   }) async {
-    await _firestore.collection('user').doc(docId).set({
+    final updateData = <String, dynamic>{
       'nama_lengkap': namaLengkap.trim(),
       'email': email.trim().toLowerCase(),
-      'role': role,
       'updated_at': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    };
+    if (role != null) {
+      updateData['role'] = role;
+    }
+    if (noTelepon != null) {
+      updateData['no_telepon'] = noTelepon.trim();
+    }
+
+    await _firestore.collection('user').doc(docId).set(
+      updateData,
+      SetOptions(merge: true),
+    );
   }
 
   /// 9. HAPUS USER DI FIRESTORE BERDASARKAN DOC ID

@@ -68,7 +68,8 @@ class _ProfilPageState extends State<ProfilPage> {
     final role = (_liveUserData?['role'] ?? widget.userData?['role'] ?? '')
         .toString()
         .trim()
-        .toLowerCase();
+        .toLowerCase()
+        .replaceAll(RegExp(r'[\s_-]'), '');
     return role == 'superadmin';
   }
 
@@ -98,8 +99,10 @@ class _ProfilPageState extends State<ProfilPage> {
     }
   }
 
-  void _showEditProfileDialog(String currentName, String currentEmail) {
+  void _showEditProfileDialog(
+      String currentName, String currentEmail, String currentPhone) {
     final nameController = TextEditingController(text: currentName);
+    final phoneController = TextEditingController(text: currentPhone);
     bool isLoading = false;
 
     showDialog(
@@ -134,6 +137,25 @@ class _ProfilPageState extends State<ProfilPage> {
                 ),
               ),
               const SizedBox(height: 12),
+              const Text('Nomor Telepon', style: TextStyle(color: textMuted, fontSize: 12)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                style: const TextStyle(color: textWhite),
+                decoration: InputDecoration(
+                  hintText: 'Contoh: 081234567890',
+                  hintStyle: const TextStyle(color: textDim),
+                  filled: true,
+                  fillColor: bgDark,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: cardBorder),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 12),
               const Text('Email', style: TextStyle(color: textMuted, fontSize: 12)),
               const SizedBox(height: 4),
               Text(
@@ -156,18 +178,27 @@ class _ProfilPageState extends State<ProfilPage> {
                   ? null
                   : () async {
                       final newName = nameController.text.trim();
+                      final newPhone = phoneController.text.trim();
                       if (newName.isEmpty) return;
 
                       setDialogState(() => isLoading = true);
                       try {
                         // Simpan perubahan ke Firestore & Firebase Auth
-                        await _authService.updateUserProfile(namaLengkap: newName);
+                        await _authService.updateUserProfile(
+                          namaLengkap: newName,
+                          noTelepon: newPhone,
+                        );
 
                         if (mounted) {
                           setState(() {
                             _customUsername = newName;
+                            if (_liveUserData != null) {
+                              _liveUserData!['nama_lengkap'] = newName;
+                              _liveUserData!['no_telepon'] = newPhone;
+                            }
                             if (widget.userData != null) {
                               widget.userData!['nama_lengkap'] = newName;
+                              widget.userData!['no_telepon'] = newPhone;
                             }
                           });
                           Navigator.pop(ctx);
@@ -207,8 +238,8 @@ class _ProfilPageState extends State<ProfilPage> {
   void _showAddUserDialog() {
     final nameController = TextEditingController();
     final emailController = TextEditingController();
+    final phoneController = TextEditingController();
     final passwordController = TextEditingController();
-    String selectedRole = 'Administrator';
     bool isLoading = false;
 
     showDialog(
@@ -265,6 +296,25 @@ class _ProfilPageState extends State<ProfilPage> {
                   ),
                 ),
                 const SizedBox(height: 14),
+                const Text('Nomor Telepon', style: TextStyle(color: textMuted, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(color: textWhite),
+                  decoration: InputDecoration(
+                    hintText: 'Contoh: 081234567890',
+                    hintStyle: const TextStyle(color: textDim),
+                    filled: true,
+                    fillColor: bgDark,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: cardBorder),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 14),
                 const Text('Kata Sandi Awal', style: TextStyle(color: textMuted, fontSize: 12)),
                 const SizedBox(height: 6),
                 TextField(
@@ -282,31 +332,6 @@ class _ProfilPageState extends State<ProfilPage> {
                     ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   ),
-                ),
-                const SizedBox(height: 14),
-                const Text('Peran / Role', style: TextStyle(color: textMuted, fontSize: 12)),
-                const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedRole,
-                  dropdownColor: cardBg,
-                  style: const TextStyle(color: textWhite),
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: bgDark,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: cardBorder),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'Administrator', child: Text('Administrator')),
-                    DropdownMenuItem(value: 'Kasir', child: Text('Kasir')),
-                    DropdownMenuItem(value: 'Mekanik', child: Text('Mekanik')),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) setDialogState(() => selectedRole = val);
-                  },
                 ),
               ],
             ),
@@ -326,6 +351,7 @@ class _ProfilPageState extends State<ProfilPage> {
                   : () async {
                       final name = nameController.text.trim();
                       final email = emailController.text.trim();
+                      final phone = phoneController.text.trim();
                       final password = passwordController.text.trim();
 
                       if (name.isEmpty || email.isEmpty) {
@@ -345,7 +371,8 @@ class _ProfilPageState extends State<ProfilPage> {
                         await _authService.addNewUser(
                           namaLengkap: name,
                           email: email,
-                          role: selectedRole,
+                          role: 'Kasir',
+                          noTelepon: phone,
                           password: password.isNotEmpty ? password : null,
                         );
 
@@ -387,7 +414,7 @@ class _ProfilPageState extends State<ProfilPage> {
   void _showEditUserDialog(Map<String, dynamic> user) {
     final nameController = TextEditingController(text: user['nama_lengkap'] ?? user['name'] ?? '');
     final emailController = TextEditingController(text: user['email'] ?? '');
-    String selectedRole = user['role'] ?? 'Kasir';
+    final phoneController = TextEditingController(text: user['no_telepon'] ?? user['noTelepon'] ?? '');
     bool isLoading = false;
 
     showDialog(
@@ -439,13 +466,15 @@ class _ProfilPageState extends State<ProfilPage> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Text('Peran / Role', style: TextStyle(color: textMuted, fontSize: 12)),
+                const Text('Nomor Telepon', style: TextStyle(color: textMuted, fontSize: 12)),
                 const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedRole,
-                  dropdownColor: cardBg,
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
                   style: const TextStyle(color: textWhite),
                   decoration: InputDecoration(
+                    hintText: 'Contoh: 081234567890',
+                    hintStyle: const TextStyle(color: textDim),
                     filled: true,
                     fillColor: bgDark,
                     border: OutlineInputBorder(
@@ -454,14 +483,6 @@ class _ProfilPageState extends State<ProfilPage> {
                     ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'Administrator', child: Text('Administrator')),
-                    DropdownMenuItem(value: 'Kasir', child: Text('Kasir')),
-                    DropdownMenuItem(value: 'Mekanik', child: Text('Mekanik')),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) setDialogState(() => selectedRole = val);
-                  },
                 ),
               ],
             ),
@@ -481,6 +502,7 @@ class _ProfilPageState extends State<ProfilPage> {
                   : () async {
                       final name = nameController.text.trim();
                       final email = emailController.text.trim();
+                      final phone = phoneController.text.trim();
                       final docId = user['id'];
 
                       if (name.isEmpty || email.isEmpty) return;
@@ -491,7 +513,7 @@ class _ProfilPageState extends State<ProfilPage> {
                           docId: docId,
                           namaLengkap: name,
                           email: email,
-                          role: selectedRole,
+                          noTelepon: phone,
                         );
 
                         if (mounted) {
@@ -644,6 +666,11 @@ class _ProfilPageState extends State<ProfilPage> {
         widget.userData?['nama_lengkap'] ??
         currentUser?.displayName ??
         'Pengguna';
+    final String phone = (_liveUserData?['no_telepon'] ??
+            widget.userData?['no_telepon'] ??
+            currentUser?.phoneNumber ??
+            '')
+        .toString();
     final String role = (_liveUserData?['role'] ??
             widget.userData?['role'] ??
             'Kasir')
@@ -695,8 +722,8 @@ class _ProfilPageState extends State<ProfilPage> {
               ),
               const SizedBox(height: 12),
               _buildActionMenuItem(
-                title: 'Ubah Data Diri & Profil',
-                onTap: () => _showEditProfileDialog(username, email),
+                title: 'Ubah Data Diri & Nomor Telepon',
+                onTap: () => _showEditProfileDialog(username, email, phone),
               ),
               const SizedBox(height: 10),
               _buildActionMenuItem(
@@ -777,8 +804,43 @@ class _ProfilPageState extends State<ProfilPage> {
                     }
 
                     final users = snapshot.data ?? [];
+                    final currentEmailClean = email.trim().toLowerCase();
+                    final currentUid = currentUser?.uid ?? '';
+                    final currentDocId =
+                        (_liveUserData?['id'] ?? widget.userData?['id'] ?? '')
+                            .toString()
+                            .trim();
 
-                    if (users.isEmpty) {
+                    // Filter agar akun superadmin dan akun yang sedang login tidak muncul di list
+                    final filteredUsers = users.where((user) {
+                      final userRole = (user['role'] ?? '')
+                          .toString()
+                          .trim()
+                          .toLowerCase()
+                          .replaceAll(RegExp(r'[\s_-]'), '');
+                      final userEmail =
+                          (user['email'] ?? '').toString().trim().toLowerCase();
+                      final userId = (user['id'] ?? '').toString().trim();
+
+                      // 1. Sembunyikan akun dengan role superadmin
+                      if (userRole == 'superadmin') return false;
+
+                      // 2. Sembunyikan akun milik pengguna yang sedang login saat ini
+                      if (currentEmailClean.isNotEmpty &&
+                          userEmail == currentEmailClean) {
+                        return false;
+                      }
+                      if (currentUid.isNotEmpty && userId == currentUid) {
+                        return false;
+                      }
+                      if (currentDocId.isNotEmpty && userId == currentDocId) {
+                        return false;
+                      }
+
+                      return true;
+                    }).toList();
+
+                    if (filteredUsers.isEmpty) {
                       return Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
@@ -797,7 +859,7 @@ class _ProfilPageState extends State<ProfilPage> {
                     }
 
                     return Column(
-                      children: users.map((user) {
+                      children: filteredUsers.map((user) {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: _buildAdminUserCard(user),
@@ -958,7 +1020,9 @@ class _ProfilPageState extends State<ProfilPage> {
   Widget _buildAdminUserCard(Map<String, dynamic> admin) {
     final String name = admin['nama_lengkap'] ?? admin['name'] ?? 'Pengguna';
     final String email = admin['email'] ?? '-';
-    final String role = admin['role'] ?? 'Kasir';
+    final String noTelepon =
+        (admin['no_telepon'] ?? admin['noTelepon'] ?? '').toString().trim();
+    final String telpDisplay = noTelepon.isNotEmpty ? noTelepon : '-';
     final String initials = _getUserInitials(name);
 
     return Container(
@@ -992,7 +1056,7 @@ class _ProfilPageState extends State<ProfilPage> {
           ),
           const SizedBox(width: 12),
 
-          // Detail Nama & Role
+          // Detail Nama & Nomor Telepon
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1007,7 +1071,7 @@ class _ProfilPageState extends State<ProfilPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$email • $role',
+                  '$email • $telpDisplay',
                   style: const TextStyle(
                     color: textMuted,
                     fontSize: 9.5,
