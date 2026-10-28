@@ -3,7 +3,6 @@ import '../components/create_password_dialog.dart';
 import '../components/moto_bottom_nav.dart';
 import '../hooks/firebase_auth.dart';
 import 'data_sparepart.dart';
-import 'kelola_stok_jasa.dart';
 import 'laporan_pendapatan.dart';
 import 'login.dart';
 import 'profil.dart';
@@ -26,11 +25,6 @@ class BerandaPage extends StatefulWidget {
 class _BerandaPageState extends State<BerandaPage> {
   final AuthService _authService = AuthService();
   Map<String, dynamic>? _liveUserData;
-  PageController? _pageController;
-  int _currentNavIndex = 0;
-
-  PageController get _controller =>
-      _pageController ??= PageController(initialPage: widget.initialIndex);
 
   // Warna Design System Penpot MotoManage
   static const Color bgDark = Color(0xFF0E1015);
@@ -47,24 +41,18 @@ class _BerandaPageState extends State<BerandaPage> {
   @override
   void initState() {
     super.initState();
-    _currentNavIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
     _loadLiveUserData();
     _checkPasswordStatus();
   }
 
-  @override
-  void dispose() {
-    _pageController?.dispose();
-    super.dispose();
-  }
-
-  void _animateToTab(int index) {
-    setState(() => _currentNavIndex = index);
-    _controller.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
+  void _navigateToPage(Widget page) {
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => page,
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      ),
     );
   }
 
@@ -140,60 +128,29 @@ class _BerandaPageState extends State<BerandaPage> {
 
     return Scaffold(
       backgroundColor: bgDark,
-      body: PageView(
-        controller: _controller,
-        physics: const BouncingScrollPhysics(),
-        onPageChanged: (index) {
-          setState(() => _currentNavIndex = index);
-        },
-        children: [
-          // 0. Tab Beranda
-          SafeArea(
-            bottom: false,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(initials, username, role, email),
-                  const SizedBox(height: 20),
-                  _buildOmzetCard('Rp 140.000'),
-                  const SizedBox(height: 16),
-                  _buildChartCard(),
-                  const SizedBox(height: 24),
-                  _buildStokMenipisSection(),
-                  const SizedBox(height: 24),
-                  _buildTransaksiTerakhirSection(),
-                ],
-              ),
-            ),
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(initials, username, role, email),
+              const SizedBox(height: 20),
+              _buildOmzetCard('Rp 140.000'),
+              const SizedBox(height: 16),
+              _buildChartCard(),
+              const SizedBox(height: 24),
+              _buildStokMenipisSection(),
+              const SizedBox(height: 24),
+              _buildTransaksiTerakhirSection(),
+            ],
           ),
-          // 1. Tab Kasir
-          RiwayatTransaksiPage(
-            userData: _liveUserData ?? widget.userData,
-            showBottomNav: false,
-          ),
-          // 2. Tab Stok & Jasa
-          KelolaStokJasaPage(
-            userData: _liveUserData ?? widget.userData,
-            showBottomNav: false,
-          ),
-          // 3. Tab Laporan
-          LaporanPendapatanPage(
-            userData: _liveUserData ?? widget.userData,
-            showBottomNav: false,
-          ),
-          // 4. Tab Profil
-          ProfilPage(
-            userData: _liveUserData ?? widget.userData,
-            showBottomNav: false,
-          ),
-        ],
+        ),
       ),
       bottomNavigationBar: MotoBottomNav(
-        currentIndex: _currentNavIndex,
+        currentIndex: 0,
         userData: _liveUserData ?? widget.userData,
-        onTabSelected: _animateToTab,
       ),
     );
   }
@@ -205,7 +162,9 @@ class _BerandaPageState extends State<BerandaPage> {
       children: [
         // Lingkaran Avatar dengan Border Merah
         GestureDetector(
-          onTap: () => _animateToTab(4),
+          onTap: () => _navigateToPage(
+            ProfilPage(userData: _liveUserData ?? widget.userData),
+          ),
           child: Container(
             width: 48,
             height: 48,
@@ -268,7 +227,9 @@ class _BerandaPageState extends State<BerandaPage> {
 
   Widget _buildOmzetCard(String nominal) {
     return GestureDetector(
-      onTap: () => _animateToTab(3),
+      onTap: () => _navigateToPage(
+        LaporanPendapatanPage(userData: _liveUserData ?? widget.userData),
+      ),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
@@ -349,7 +310,11 @@ class _BerandaPageState extends State<BerandaPage> {
               const SizedBox(width: 8),
               // Tombol Detail
               GestureDetector(
-                onTap: () => _animateToTab(3),
+                onTap: () => _navigateToPage(
+                  LaporanPendapatanPage(
+                    userData: _liveUserData ?? widget.userData,
+                  ),
+                ),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
                   decoration: BoxDecoration(
@@ -606,7 +571,9 @@ class _BerandaPageState extends State<BerandaPage> {
         const SizedBox(height: 12),
 
         GestureDetector(
-          onTap: () => _animateToTab(1),
+          onTap: () => _navigateToPage(
+            RiwayatTransaksiPage(userData: _liveUserData ?? widget.userData),
+          ),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
