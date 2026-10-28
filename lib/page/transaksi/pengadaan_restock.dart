@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../components/back_button_circle.dart';
 
 class RestockItemModel {
   String id;
@@ -267,23 +268,7 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
               // 1. Header (Tombol Kembali, Judul, Subtitle)
               Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: cardBg,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: cardBorder, width: 1),
-                      ),
-                      child: const Icon(
-                        Icons.chevron_left_rounded,
-                        color: textWhite,
-                        size: 24,
-                      ),
-                    ),
-                  ),
+                  const BackButtonCircle(),
                   const SizedBox(width: 14),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../components/back_button_circle.dart';
 import '../../components/moto_bottom_nav.dart';
+import '../../components/rupiah_formatter.dart';
 import '../beranda.dart';
 import 'tambah_sparepart.dart';
 
@@ -133,19 +135,7 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
     super.dispose();
   }
 
-  String _formatRupiah(int nominal) {
-    final str = nominal.toString();
-    final buffer = StringBuffer();
-    int count = 0;
-    for (int i = str.length - 1; i >= 0; i--) {
-      buffer.write(str[i]);
-      count++;
-      if (count % 3 == 0 && i != 0) {
-        buffer.write('.');
-      }
-    }
-    return 'Rp ${buffer.toString().split('').reversed.join('')}';
-  }
+  String _formatRupiah(int nominal) => formatRupiah(nominal);
 
   void _openTambahSparepart() async {
     final result = await Navigator.push<SparepartModel>(
@@ -238,7 +228,7 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
       child: Row(
         children: [
           // Tombol Kembali
-          GestureDetector(
+          BackButtonCircle(
             onTap: () {
               if (widget.onNavigateTab != null) {
                 widget.onNavigateTab!(0);
@@ -253,20 +243,6 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
                 );
               }
             },
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: cardBg,
-                shape: BoxShape.circle,
-                border: Border.all(color: cardBorder, width: 1),
-              ),
-              child: const Icon(
-                Icons.chevron_left_rounded,
-                color: textWhite,
-                size: 24,
-              ),
-            ),
           ),
           const SizedBox(width: 14),
 

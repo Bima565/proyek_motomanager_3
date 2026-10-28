@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../components/back_button_circle.dart';
+import '../../components/rupiah_formatter.dart';
 import 'nota_pembayaran.dart';
 
 class KasirItemModel {
@@ -94,19 +96,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
 
   int get _totalBayar => _items.fold(0, (sum, item) => sum + item.total);
 
-  String _formatRupiah(int nominal) {
-    final str = nominal.toString();
-    final buffer = StringBuffer();
-    int count = 0;
-    for (int i = str.length - 1; i >= 0; i--) {
-      buffer.write(str[i]);
-      count++;
-      if (count % 3 == 0 && i != 0) {
-        buffer.write('.');
-      }
-    }
-    return 'Rp ${buffer.toString().split('').reversed.join('')}';
-  }
+  String _formatRupiah(int nominal) => formatRupiah(nominal);
 
   void _showEditCustomerDialog() {
     final nameCtrl = TextEditingController(text: _customerName);
@@ -798,19 +788,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
   Widget _buildHeader(String kasirName) {
     return Row(
       children: [
-        GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: cardBg,
-              shape: BoxShape.circle,
-              border: Border.all(color: cardBorder, width: 1),
-            ),
-            child: const Icon(Icons.chevron_left_rounded, color: textWhite, size: 22),
-          ),
-        ),
+        const BackButtonCircle(),
         const SizedBox(width: 12),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
