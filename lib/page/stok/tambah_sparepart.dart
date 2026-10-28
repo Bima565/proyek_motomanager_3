@@ -28,8 +28,6 @@ class _TambahSparepartPageState extends State<TambahSparepartPage> {
       TextEditingController(text: '45000');
 
   String _selectedCategory = 'Oli & Pelumas Mesin';
-  int _stockQuantity = 24;
-  final String _selectedUnit = 'Pcs';
 
   final List<String> _categoryOptions = [
     'Oli & Pelumas Mesin',
@@ -62,8 +60,8 @@ class _TambahSparepartPageState extends State<TambahSparepartPage> {
         category: _selectedCategory.replaceAll(' Mesin', ''),
         buyPrice: buyPrice,
         sellPrice: sellPrice,
-        stock: _stockQuantity,
-        unit: _selectedUnit,
+        stock: 0,
+        unit: 'Pcs',
         lastUpdated: dateStr,
       );
 
@@ -184,69 +182,9 @@ class _TambahSparepartPageState extends State<TambahSparepartPage> {
                       ),
                       const SizedBox(height: 18),
 
-                      // Field 3 & 4: Harga Beli & Harga Jual
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Harga beli',
-                                  style: TextStyle(
-                                    color: textMuted,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                TextFormField(
-                                  controller: _buyPriceController,
-                                  keyboardType: TextInputType.number,
-                                  style: const TextStyle(
-                                    color: accentGreen,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  decoration: _buildInputDecoration('Rp 0', prefix: 'Rp '),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Harga Jual',
-                                  style: TextStyle(
-                                    color: textMuted,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                TextFormField(
-                                  controller: _sellPriceController,
-                                  keyboardType: TextInputType.number,
-                                  style: const TextStyle(
-                                    color: accentGreen,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  decoration: _buildInputDecoration('Rp 0', prefix: 'Rp '),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-
-                      // Field 5: Jumlah Stok Masuk (Counter)
+                      // Field 3: Harga beli
                       const Text(
-                        'Jumlah Stok Masuk',
+                        'Harga beli',
                         style: TextStyle(
                           color: textMuted,
                           fontSize: 12,
@@ -254,83 +192,37 @@ class _TambahSparepartPageState extends State<TambahSparepartPage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: bgDark,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: cardBorder, width: 1),
+                      TextFormField(
+                        controller: _buyPriceController,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(
+                          color: accentGreen,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            // Tombol Minus [-]
-                            InkWell(
-                              onTap: () {
-                                if (_stockQuantity > 1) {
-                                  setState(() => _stockQuantity--);
-                                }
-                              },
-                              borderRadius: BorderRadius.circular(6),
-                              child: Container(
-                                width: 34,
-                                height: 34,
-                                decoration: BoxDecoration(
-                                  color: cardBg,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: cardBorder, width: 1),
-                                ),
-                                child: const Center(
-                                  child: Text(
-                                    '-',
-                                    style: TextStyle(
-                                      color: textWhite,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+                        decoration: _buildInputDecoration('Rp 0', prefix: 'Rp '),
+                      ),
+                      const SizedBox(height: 18),
 
-                            // Nilai Jumlah & Satuan
-                            Text(
-                              '$_stockQuantity $_selectedUnit',
-                              style: const TextStyle(
-                                color: textWhite,
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-
-                            // Tombol Plus [+]
-                            InkWell(
-                              onTap: () {
-                                setState(() => _stockQuantity++);
-                              },
-                              borderRadius: BorderRadius.circular(6),
-                              child: Container(
-                                width: 34,
-                                height: 34,
-                                decoration: BoxDecoration(
-                                  color: cardBg,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: cardBorder, width: 1),
-                                ),
-                                child: const Center(
-                                  child: Text(
-                                    '+',
-                                    style: TextStyle(
-                                      color: textWhite,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                      // Field 4: Harga Jual
+                      const Text(
+                        'Harga Jual',
+                        style: TextStyle(
+                          color: textMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _sellPriceController,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(
+                          color: accentGreen,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: _buildInputDecoration('Rp 0', prefix: 'Rp '),
                       ),
                     ],
                   ),

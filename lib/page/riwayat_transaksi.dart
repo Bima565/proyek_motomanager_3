@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../components/moto_bottom_nav.dart';
 import 'transaksi/kasir_transaksi.dart';
 import 'transaksi/nota_pembayaran.dart';
+import 'transaksi/pengadaan_restock.dart';
 
 class TransaksiRecord {
   final String code;
@@ -51,27 +52,9 @@ class TransaksiRecord {
         return '';
     }
   }
-
-  String get monthName {
-    const months = [
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember'
-    ];
-    return '${months[dateTime.month - 1]} ${dateTime.year}';
-  }
 }
 
-/// Screen 12 - (FR07) Riwayat Transaksi & Kasir
+/// Screen 12 & Screen 12B - (FR07 & FR09) Riwayat Transaksi & Pembelian
 class RiwayatTransaksiPage extends StatefulWidget {
   final Map<String, dynamic>? userData;
   final bool showBottomNav;
@@ -99,22 +82,24 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
   static const Color textMuted = Color(0xFF94A3B8);
   static const Color textDim = Color(0xFF6B7280);
 
-  // Filter Modes: '1 Hari' | 'Rentang' | 'Bulanan'
-  String _periodMode = '1 Hari';
+  // Tab Index: 0 = Transaksi Penjualan / Jasa (Screen 12), 1 = Transaksi Pembelian (Screen 12B)
+  int _activeTab = 0;
 
-  // State DateTime filter
-  DateTime? _selectedDate; // Untuk mode '1 Hari' (null = Semua Hari)
-  DateTimeRange? _selectedDateRange; // Untuk mode 'Rentang'
-  DateTime? _selectedMonth; // Untuk mode 'Bulanan' (null = Semua Bulan)
+  // Filter Tanggal Rentang Waktu
+  DateTime _startDate = DateTime(2026, 9, 20);
+  DateTime _endDate = DateTime(2026, 10, 26);
 
-  // Filter Metode Pembayaran: 'Semua' | 'QRIS' | 'TUNAI'
+  // Quick Period Pill (1 Hari | 7 Hari | 30 Hari | Semua)
+  String _selectedQuickPeriod = 'Semua';
+
+  // Filter Metode Pembayaran (khusus penjualan): 'Semua' | 'QRIS' | 'TUNAI'
   String _selectedPayment = 'Semua';
 
-  // Seed Data Transaksi menggunakan objek DateTime presisi
-  final List<TransaksiRecord> _transactions = [
+  // Seed Data Transaksi Penjualan / Jasa (Screen 12)
+  final List<TransaksiRecord> _salesTransactions = [
     TransaksiRecord(
       code: '#TRX-005',
-      dateTime: DateTime(2026, 9, 20, 8, 30), // Sabtu
+      dateTime: DateTime(2026, 9, 20, 8, 30),
       payment: 'QRIS',
       amount: 40000,
       customer: 'Dian Pratama',
@@ -123,7 +108,7 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
     ),
     TransaksiRecord(
       code: '#TRX-004',
-      dateTime: DateTime(2026, 9, 20, 10, 15), // Sabtu
+      dateTime: DateTime(2026, 9, 20, 10, 15),
       payment: 'TUNAI',
       amount: 95000,
       customer: 'Rudi Hartono',
@@ -132,7 +117,7 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
     ),
     TransaksiRecord(
       code: '#TRX-003',
-      dateTime: DateTime(2026, 9, 19, 14, 20), // Jumat
+      dateTime: DateTime(2026, 9, 19, 14, 20),
       payment: 'TUNAI',
       amount: 80000,
       customer: 'Ibu Sri Wahyuni',
@@ -141,7 +126,7 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
     ),
     TransaksiRecord(
       code: '#TRX-002',
-      dateTime: DateTime(2026, 9, 18, 11, 0), // Kamis
+      dateTime: DateTime(2026, 9, 18, 11, 0),
       payment: 'QRIS',
       amount: 130000,
       customer: 'Ahmad Fauzi',
@@ -150,53 +135,117 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
     ),
     TransaksiRecord(
       code: '#TRX-001',
-      dateTime: DateTime(2026, 9, 17, 9, 10), // Rabu
+      dateTime: DateTime(2026, 9, 17, 9, 10),
       payment: 'TUNAI',
       amount: 105000,
       customer: 'Budi Santoso',
       vehicle: 'Honda Beat FI',
       service: 'Servis Ringan + Oli MPX2 + Busi',
     ),
-    TransaksiRecord(
-      code: '#TRX-006',
-      dateTime: DateTime(2026, 9, 16, 16, 0), // Selasa
-      payment: 'QRIS',
-      amount: 65000,
-      customer: 'Agus Wahyudi',
-      vehicle: 'Yamaha Aerox 155',
-      service: 'Ganti Oli Gardan + Busi',
-    ),
-    TransaksiRecord(
-      code: '#TRX-007',
-      dateTime: DateTime(2026, 9, 15, 13, 45), // Senin
-      payment: 'TUNAI',
-      amount: 50000,
-      customer: 'Dewi Lestari',
-      vehicle: 'Honda Scoopy',
-      service: 'Stel Klep & Servis Karburator',
-    ),
-    TransaksiRecord(
-      code: '#TRX-008',
-      dateTime: DateTime(2026, 8, 28, 15, 20), // Jumat, Agustus 2026
-      payment: 'QRIS',
-      amount: 85000,
-      customer: 'Hendro Gunawan',
-      vehicle: 'Suzuki Satria F150',
-      service: 'Ganti Kampas Rem Depan Belakang',
-    ),
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    // Default: Mode '1 Hari' menunjuk ke tanggal transaksi terbaru (20 Sept 2026)
-    _selectedDate = DateTime(2026, 9, 20);
-    _selectedDateRange = DateTimeRange(
-      start: DateTime(2026, 9, 15),
-      end: DateTime(2026, 9, 20),
-    );
-    _selectedMonth = DateTime(2026, 9, 1);
-  }
+  // Seed Data Transaksi Pembelian / Restock (Screen 12B)
+  final List<PembelianRecord> _purchaseTransactions = [
+    PembelianRecord(
+      code: '#BELI-005',
+      dateTime: DateTime(2026, 10, 5),
+      buyerName: 'Sugeng Yulianto',
+      supplier: 'Toko Sumber Jaya',
+      items: [
+        RestockItemModel(
+          id: '1',
+          name: 'Velg Jari-jari 125',
+          category: 'velg',
+          buyPrice: 90000,
+          quantity: 10,
+        ),
+        RestockItemModel(
+          id: '2',
+          name: 'Oli MPX2',
+          category: 'oli',
+          buyPrice: 60000,
+          quantity: 20,
+        ),
+      ],
+      totalAmount: 2100000,
+      status: 'LUNAS',
+    ),
+    PembelianRecord(
+      code: '#BELI-004',
+      dateTime: DateTime(2026, 10, 12),
+      buyerName: 'Sugeng Yulianto',
+      supplier: 'PT Astra Motor Parts',
+      items: [
+        RestockItemModel(
+          id: '3',
+          name: 'Kampas Rem Depan',
+          category: 'rem',
+          buyPrice: 40000,
+          quantity: 15,
+        ),
+        RestockItemModel(
+          id: '4',
+          name: 'Busi NGK',
+          category: 'kelistrikan',
+          buyPrice: 20000,
+          quantity: 20,
+        ),
+      ],
+      totalAmount: 875000,
+      status: 'LUNAS',
+    ),
+    PembelianRecord(
+      code: '#BELI-003',
+      dateTime: DateTime(2026, 10, 18),
+      buyerName: 'Sugeng Yulianto',
+      supplier: 'Distributor Ban FDR',
+      items: [
+        RestockItemModel(
+          id: '5',
+          name: 'Ban Luar Tubeless FDR 90/90-14',
+          category: 'ban',
+          buyPrice: 150000,
+          quantity: 8,
+        ),
+      ],
+      totalAmount: 1480000,
+      status: 'LUNAS',
+    ),
+    PembelianRecord(
+      code: '#BELI-002',
+      dateTime: DateTime(2026, 10, 22),
+      buyerName: 'Sugeng Yulianto',
+      supplier: 'PT Yamalube Indonesia',
+      items: [
+        RestockItemModel(
+          id: '6',
+          name: 'Oli Yamalube Silver 0.8L',
+          category: 'oli',
+          buyPrice: 35000,
+          quantity: 24,
+        ),
+      ],
+      totalAmount: 840000,
+      status: 'LUNAS',
+    ),
+    PembelianRecord(
+      code: '#BELI-001',
+      dateTime: DateTime(2026, 10, 26),
+      buyerName: 'Sugeng Yulianto',
+      supplier: 'Grosir Jaya Part',
+      items: [
+        RestockItemModel(
+          id: '7',
+          name: 'Roller Set Honda Beat FI (11g)',
+          category: 'cvt',
+          buyPrice: 28000,
+          quantity: 12,
+        ),
+      ],
+      totalAmount: 480000,
+      status: 'LUNAS',
+    ),
+  ];
 
   String _formatRupiah(int nominal) {
     final str = nominal.toString();
@@ -212,199 +261,482 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
     return 'Rp ${buffer.toString().split('').reversed.join('')}';
   }
 
-  String _formatDateShort(DateTime d) {
-    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  String _formatDateIso(DateTime d) {
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '${d.year}-$m-$day';
   }
 
-  String _formatMonthYear(DateTime d) {
-    const months = [
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember'
-    ];
-    return '${months[d.month - 1]} ${d.year}';
-  }
+  // --- POPUP DATE PICKER DIALOG SESUAI REQUEST USER ---
+  Future<void> _openDatePickerPopup({required bool isStart}) async {
+    DateTime tempDate = isStart ? _startDate : _endDate;
+    DateTime viewMonth = DateTime(tempDate.year, tempDate.month, 1);
+    String viewMode = 'day'; // 'day' | 'month' | 'year'
 
-  String _getDayName(DateTime d) {
-    switch (d.weekday) {
-      case DateTime.monday:
-        return 'Senin';
-      case DateTime.tuesday:
-        return 'Selasa';
-      case DateTime.wednesday:
-        return 'Rabu';
-      case DateTime.thursday:
-        return 'Kamis';
-      case DateTime.friday:
-        return 'Jumat';
-      case DateTime.saturday:
-        return 'Sabtu';
-      case DateTime.sunday:
-        return 'Minggu';
-      default:
-        return '';
-    }
-  }
-
-  // --- HTML-like Native DatePicker Dialog Helpers ---
-  Future<void> _openDatePicker() async {
-    final initial = _selectedDate ?? DateTime(2026, 9, 20);
-    final picked = await showDatePicker(
+    await showDialog(
       context: context,
-      initialDate: initial,
-      firstDate: DateTime(2025, 1, 1),
-      lastDate: DateTime(2027, 12, 31),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: accentRed,
-              onPrimary: textWhite,
-              surface: cardBg,
-              onSurface: textWhite,
-            ),
-            dialogTheme: const DialogThemeData(backgroundColor: bgDark),
-          ),
-          child: child!,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final daysInMonth = DateUtils.getDaysInMonth(viewMonth.year, viewMonth.month);
+            final firstDayOffset = DateTime(viewMonth.year, viewMonth.month, 1).weekday % 7; // Sunday = 0
+
+            const monthNames = [
+              'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+              'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+            ];
+
+            // Daftar tahun dinamis sesuai tahun saat ini (10 tahun ke belakang s/d 25 tahun ke depan)
+            final int currentYear = DateTime.now().year;
+            final List<int> yearsList = List.generate(36, (i) => (currentYear - 10) + i);
+
+            return Dialog(
+              backgroundColor: const Color(0xFF151821),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: cardBorder, width: 1),
+              ),
+              child: Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxWidth: 345),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header Bulan & Tahun (Klik untuk Timpa Pop-up Pilih Bulan / Tahun)
+                    Row(
+                      children: [
+                        // Tombol Pilih Bulan (Timpa Pop-up)
+                        InkWell(
+                          onTap: () {
+                            setDialogState(() {
+                              viewMode = (viewMode == 'month') ? 'day' : 'month';
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: viewMode == 'month' ? accentRed.withValues(alpha: 0.2) : cardBorder.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: viewMode == 'month' ? accentRed : cardBorder,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  monthNames[viewMonth.month - 1],
+                                  style: TextStyle(
+                                    color: viewMode == 'month' ? accentRed : textWhite,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                Icon(
+                                  viewMode == 'month' ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded,
+                                  color: viewMode == 'month' ? accentRed : textMuted,
+                                  size: 16,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+
+                        // Tombol Pilih Tahun (Timpa Pop-up)
+                        InkWell(
+                          onTap: () {
+                            setDialogState(() {
+                              viewMode = (viewMode == 'year') ? 'day' : 'year';
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: viewMode == 'year' ? accentRed.withValues(alpha: 0.2) : cardBorder.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: viewMode == 'year' ? accentRed : cardBorder,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${viewMonth.year}',
+                                  style: TextStyle(
+                                    color: viewMode == 'year' ? accentRed : textWhite,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                Icon(
+                                  viewMode == 'year' ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded,
+                                  color: viewMode == 'year' ? accentRed : textMuted,
+                                  size: 16,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const Spacer(),
+
+                        // Tombol Navigasi Prev/Next Bulan (hanya saat mode hari)
+                        if (viewMode == 'day') ...[
+                          GestureDetector(
+                            onTap: () {
+                              setDialogState(() {
+                                viewMonth = DateTime(viewMonth.year, viewMonth.month - 1, 1);
+                              });
+                            },
+                            child: Container(
+                              width: 26,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E2333),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: cardBorder),
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.chevron_left_rounded, color: textWhite, size: 16),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: () {
+                              setDialogState(() {
+                                viewMonth = DateTime(viewMonth.year, viewMonth.month + 1, 1);
+                              });
+                            },
+                            child: Container(
+                              width: 26,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E2333),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: cardBorder),
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.chevron_right_rounded, color: textWhite, size: 16),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // BODY TAMPILAN TIMPA POP-UP (Bulan / Tahun / Hari)
+                    if (viewMode == 'month') ...[
+                      // 1. Grid Pilihan Bulan
+                      SizedBox(
+                        height: 230,
+                        child: GridView.builder(
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: 12,
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            childAspectRatio: 2.2,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                          itemBuilder: (context, index) {
+                            final isCurrentMonth = (index + 1) == viewMonth.month;
+                            return InkWell(
+                              onTap: () {
+                                setDialogState(() {
+                                  viewMonth = DateTime(viewMonth.year, index + 1, 1);
+                                  viewMode = 'day';
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: isCurrentMonth ? const Color(0xFF007BFF) : inputBg,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isCurrentMonth ? const Color(0xFF007BFF) : cardBorder,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    monthNames[index],
+                                    style: TextStyle(
+                                      color: isCurrentMonth ? textWhite : const Color(0xFFCBD5E1),
+                                      fontSize: 12,
+                                      fontWeight: isCurrentMonth ? FontWeight.bold : FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ] else if (viewMode == 'year') ...[
+                      // 2. Grid Pilihan Tahun (Scrollable & Update Dinamis)
+                      SizedBox(
+                        height: 230,
+                        child: GridView.builder(
+                          itemCount: yearsList.length,
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            childAspectRatio: 2.2,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                          itemBuilder: (context, index) {
+                            final year = yearsList[index];
+                            final isCurrentYear = year == viewMonth.year;
+                            return InkWell(
+                              onTap: () {
+                                setDialogState(() {
+                                  viewMonth = DateTime(year, viewMonth.month, 1);
+                                  viewMode = 'day';
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: isCurrentYear ? const Color(0xFF007BFF) : inputBg,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isCurrentYear ? const Color(0xFF007BFF) : cardBorder,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '$year',
+                                    style: TextStyle(
+                                      color: isCurrentYear ? textWhite : const Color(0xFFCBD5E1),
+                                      fontSize: 13,
+                                      fontWeight: isCurrentYear ? FontWeight.bold : FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ] else ...[
+                      // 3. Grid Kalender Hari (Normal)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: const [
+                          Text('Min', style: TextStyle(color: textDim, fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text('Sen', style: TextStyle(color: textDim, fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text('Sel', style: TextStyle(color: textDim, fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text('Rab', style: TextStyle(color: textDim, fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text('Kam', style: TextStyle(color: textDim, fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text('Jum', style: TextStyle(color: textDim, fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text('Sab', style: TextStyle(color: textDim, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: 42,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 7,
+                          mainAxisSpacing: 4,
+                          crossAxisSpacing: 4,
+                          childAspectRatio: 1,
+                        ),
+                        itemBuilder: (context, index) {
+                          final dayNumber = index - firstDayOffset + 1;
+                          if (dayNumber < 1 || dayNumber > daysInMonth) {
+                            return const SizedBox();
+                          }
+
+                          final currentCalDate = DateTime(viewMonth.year, viewMonth.month, dayNumber);
+                          final isSelected = currentCalDate.year == tempDate.year &&
+                              currentCalDate.month == tempDate.month &&
+                              currentCalDate.day == tempDate.day;
+
+                          return GestureDetector(
+                            onTap: () {
+                              setDialogState(() {
+                                tempDate = currentCalDate;
+                              });
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: isSelected ? const Color(0xFF007BFF) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '$dayNumber',
+                                  style: TextStyle(
+                                    color: isSelected ? textWhite : const Color(0xFFCBD5E1),
+                                    fontSize: 12,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+
+                    // Footer Dialog: Tombol Today, Cancel, OK
+                    Row(
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            final now = DateTime.now();
+                            setDialogState(() {
+                              tempDate = now;
+                              viewMonth = DateTime(now.year, now.month, 1);
+                              viewMode = 'day';
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF007BFF),
+                            foregroundColor: textWhite,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            minimumSize: Size.zero,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            elevation: 0,
+                          ),
+                          child: const Text('Today', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                        const Spacer(),
+                        ElevatedButton(
+                          onPressed: () {
+                            if (isStart) {
+                              setState(() => _startDate = tempDate);
+                            } else {
+                              setState(() => _endDate = tempDate);
+                            }
+                            Navigator.pop(dialogCtx);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF007BFF),
+                            foregroundColor: textWhite,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            minimumSize: Size.zero,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            elevation: 0,
+                          ),
+                          child: const Text('OK', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(dialogCtx),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF475569),
+                            foregroundColor: textWhite,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            minimumSize: Size.zero,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            elevation: 0,
+                          ),
+                          child: const Text('Cancel', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
-
-    if (picked != null) {
-      setState(() => _selectedDate = picked);
-    }
   }
 
-  Future<void> _openDateRangePicker() async {
-    final initial = _selectedDateRange ??
-        DateTimeRange(
-          start: DateTime(2026, 9, 15),
-          end: DateTime(2026, 9, 20),
-        );
-
-    final picked = await showDateRangePicker(
-      context: context,
-      initialDateRange: initial,
-      firstDate: DateTime(2025, 1, 1),
-      lastDate: DateTime(2027, 12, 31),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: accentRed,
-              onPrimary: textWhite,
-              surface: cardBg,
-              onSurface: textWhite,
-            ),
-            dialogTheme: const DialogThemeData(backgroundColor: bgDark),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() => _selectedDateRange = picked);
-    }
+  void _applyQuickPeriod(String period) {
+    setState(() {
+      _selectedQuickPeriod = period;
+      final now = DateTime(2026, 10, 26);
+      if (period == '1 Hari') {
+        _startDate = now;
+        _endDate = now;
+      } else if (period == '7 Hari') {
+        _startDate = now.subtract(const Duration(days: 7));
+        _endDate = now;
+      } else if (period == '30 Hari') {
+        _startDate = now.subtract(const Duration(days: 30));
+        _endDate = now;
+      } else {
+        _startDate = DateTime(2026, 9, 1);
+        _endDate = DateTime(2026, 10, 31);
+      }
+    });
   }
 
-  // --- FILTER ENGINE BERBASIS DATETIME ---
-  List<TransaksiRecord> _getFilteredTransactions() {
-    return _transactions.where((t) {
-      // 1. Filter Pembayaran
+  List<TransaksiRecord> get _filteredSales {
+    return _salesTransactions.where((t) {
       if (_selectedPayment != 'Semua' &&
           t.payment.toUpperCase() != _selectedPayment.toUpperCase()) {
         return false;
       }
+      final dateOnly = DateTime(t.dateTime.year, t.dateTime.month, t.dateTime.day);
+      final startOnly = DateTime(_startDate.year, _startDate.month, _startDate.day);
+      final endOnly = DateTime(_endDate.year, _endDate.month, _endDate.day);
 
-      // 2. Filter Berdasarkan Mode DateTime
-      if (_periodMode == '1 Hari') {
-        if (_selectedDate != null) {
-          final isSameDay = t.dateTime.year == _selectedDate!.year &&
-              t.dateTime.month == _selectedDate!.month &&
-              t.dateTime.day == _selectedDate!.day;
-          if (!isSameDay) return false;
-        }
-      } else if (_periodMode == 'Rentang') {
-        if (_selectedDateRange != null) {
-          final start = DateTime(
-            _selectedDateRange!.start.year,
-            _selectedDateRange!.start.month,
-            _selectedDateRange!.start.day,
-            0,
-            0,
-            0,
-          );
-          final end = DateTime(
-            _selectedDateRange!.end.year,
-            _selectedDateRange!.end.month,
-            _selectedDateRange!.end.day,
-            23,
-            59,
-            59,
-          );
-          if (t.dateTime.isBefore(start) || t.dateTime.isAfter(end)) {
-            return false;
-          }
-        }
-      } else if (_periodMode == 'Bulanan') {
-        if (_selectedMonth != null) {
-          final isSameMonth = t.dateTime.year == _selectedMonth!.year &&
-              t.dateTime.month == _selectedMonth!.month;
-          if (!isSameMonth) return false;
-        }
-      }
-
-      return true;
+      return (dateOnly.isAtSameMomentAs(startOnly) || dateOnly.isAfter(startOnly)) &&
+          (dateOnly.isAtSameMomentAs(endOnly) || dateOnly.isBefore(endOnly));
     }).toList();
   }
 
-  // Counter helper untuk bubble chips
-  int _countForDate(DateTime d) {
-    return _transactions.where((t) {
-      if (_selectedPayment != 'Semua' &&
-          t.payment.toUpperCase() != _selectedPayment.toUpperCase()) {
-        return false;
-      }
-      return t.dateTime.year == d.year &&
-          t.dateTime.month == d.month &&
-          t.dateTime.day == d.day;
-    }).length;
+  List<PembelianRecord> get _filteredPurchases {
+    return _purchaseTransactions.where((p) {
+      final dateOnly = DateTime(p.dateTime.year, p.dateTime.month, p.dateTime.day);
+      final startOnly = DateTime(_startDate.year, _startDate.month, _startDate.day);
+      final endOnly = DateTime(_endDate.year, _endDate.month, _endDate.day);
+
+      return (dateOnly.isAtSameMomentAs(startOnly) || dateOnly.isAfter(startOnly)) &&
+          (dateOnly.isAtSameMomentAs(endOnly) || dateOnly.isBefore(endOnly));
+    }).toList();
   }
 
-  int _countForMonth(DateTime m) {
-    return _transactions.where((t) {
-      if (_selectedPayment != 'Semua' &&
-          t.payment.toUpperCase() != _selectedPayment.toUpperCase()) {
-        return false;
+  void _openTambahPembelian() async {
+    final newBeli = await Navigator.push<PembelianRecord>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PengadaanRestockPage(userData: widget.userData),
+      ),
+    );
+
+    if (newBeli != null) {
+      setState(() {
+        _purchaseTransactions.insert(0, newBeli);
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF143322),
+            content: Text('Pembelian ${newBeli.code} berhasil disimpan & stok bertambah!'),
+          ),
+        );
       }
-      return t.dateTime.year == m.year && t.dateTime.month == m.month;
-    }).length;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _getFilteredTransactions();
+    final filteredSales = _filteredSales;
+    final filteredPurchases = _filteredPurchases;
 
-    final int totalAmount = filtered.fold<int>(
-      0,
-      (sum, t) => sum + t.amount,
-    );
-
-    final bool isFilterActive = (_periodMode == '1 Hari' &&
-            _selectedDate != null) ||
-        (_periodMode == 'Rentang' && _selectedDateRange != null) ||
-        (_periodMode == 'Bulanan' && _selectedMonth != null) ||
-        _selectedPayment != 'Semua';
+    final int totalPenjualan = filteredSales.fold(0, (sum, t) => sum + t.amount);
+    final int totalPembelian = filteredPurchases.fold(0, (sum, p) => sum + p.totalAmount);
 
     return Scaffold(
       backgroundColor: bgDark,
@@ -412,7 +744,7 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
         bottom: false,
         child: Column(
           children: [
-            // 1. Header Section
+            // 1. Header (Judul & Subjudul Info)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Row(
@@ -431,49 +763,22 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${filtered.length} Transaksi • ${_formatRupiah(totalAmount)}',
-                        style: const TextStyle(
-                          color: accentGreen,
+                        _activeTab == 0
+                            ? '${filteredSales.length} Transaksi • ${_formatRupiah(totalPenjualan)}'
+                            : '${filteredPurchases.length} Pembelian • ${_formatRupiah(totalPembelian)}',
+                        style: TextStyle(
+                          color: _activeTab == 0 ? accentGreen : const Color(0xFFF87171),
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
                   ),
-                  if (isFilterActive)
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedDate = null;
-                          _selectedDateRange = null;
-                          _selectedMonth = null;
-                          _selectedPayment = 'Semua';
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2B1519),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: accentRed.withValues(alpha: 0.4)),
-                        ),
-                        child: const Text(
-                          'Reset Semua',
-                          style: TextStyle(
-                            color: accentRed,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
 
-            // 2. Tab Segment Switcher (1 Hari | Rentang | Bulanan)
+            // 2. Tab Segmented Sesuai Penpot Screen 12 & Screen 12B
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
               child: Container(
@@ -485,228 +790,89 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
                 ),
                 child: Row(
                   children: [
-                    _buildModeSegment('1 Hari', ' 1 Hari'),
+                    _buildMainTabSegment(0, 'Transaksi Penjualan / Jasa'),
                     const SizedBox(width: 4),
-                    _buildModeSegment('Rentang', ' Rentang'),
-                    const SizedBox(width: 4),
-                    _buildModeSegment('Bulanan', ' Bulanan'),
+                    _buildMainTabSegment(1, 'Transaksi Pembelian'),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
 
-            // 3. HTML-like DateTime Control Box (<input type="date|month"> style)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _buildHtmlTimeControl(),
-            ),
-            const SizedBox(height: 8),
-
-            // 4. Quick Bubble Chips Filter
-            SizedBox(
-              height: 34,
-              child: _buildQuickBubbleBar(),
-            ),
-            const SizedBox(height: 8),
-
-            // 5. Bubble Filter Metode Pembayaran
+            // 3. Date Range Selector Bar Pop-up (Start & End Date)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  const Text(
-                    'Metode:',
-                    style: TextStyle(
-                      color: textDim,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
+                  // Start Date Input Box
+                  Expanded(
+                    child: _buildDateBox(
+                      label: 'Start',
+                      dateStr: _formatDateIso(_startDate),
+                      onTap: () => _openDatePickerPopup(isStart: true),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  _buildPaymentChip('Semua'),
-                  const SizedBox(width: 6),
-                  _buildPaymentChip('QRIS'),
-                  const SizedBox(width: 6),
-                  _buildPaymentChip('TUNAI'),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6),
+                    child: Icon(Icons.arrow_forward_rounded, color: textDim, size: 14),
+                  ),
+                  // End Date Input Box
+                  Expanded(
+                    child: _buildDateBox(
+                      label: 'End',
+                      dateStr: _formatDateIso(_endDate),
+                      onTap: () => _openDatePickerPopup(isStart: false),
+                    ),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
 
-            // 6. Daftar Transaksi List / Empty State
-            Expanded(
-              child: filtered.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(20, 2, 20, 16),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final trx = filtered[index];
-                        final isQris = trx.payment == 'QRIS';
-
-                        return InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => NotaPembayaranPage(
-                                  noNota: trx.code,
-                                  waktu: trx.timeFormatted,
-                                  pelanggan:
-                                      '${trx.customer} (${trx.vehicle})',
-                                  kasir: widget.userData?['nama_lengkap'] ??
-                                      'Sri Ekowati',
-                                  items: [
-                                    KasirItemModel(
-                                      id: '1',
-                                      name: trx.service,
-                                      category: 'Layanan Servis',
-                                      subInfo: 'Transaksi Kasir',
-                                      price: trx.amount,
-                                      quantity: 1,
-                                      isService: true,
-                                    ),
-                                  ],
-                                  totalBayar: trx.amount,
-                                  tunaiDiterima: trx.amount,
-                                  paymentMethod:
-                                      isQris ? 'QRIS' : 'Tunai',
-                                  userData: widget.userData,
-                                ),
-                              ),
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: cardBg,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: cardBorder, width: 1),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Baris 1: Kode TRX, Hari & Waktu, Badge Payment, Nominal Hijau
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF1E2433),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        trx.dayName,
-                                        style: const TextStyle(
-                                          color: textWhite,
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '${trx.code} • ${trx.timeFormatted}',
-                                      style: const TextStyle(
-                                        color: textDim,
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: isQris
-                                            ? const Color(0xFF0C243B)
-                                            : const Color(0xFF0F2E1E),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                          color: isQris
-                                              ? const Color(0xFF1E40AF)
-                                              : const Color(0xFF166534),
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        trx.payment,
-                                        style: TextStyle(
-                                          color: isQris
-                                              ? accentBlue
-                                              : accentGreen,
-                                          fontSize: 8.5,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Text(
-                                      _formatRupiah(trx.amount),
-                                      style: const TextStyle(
-                                        color: accentGreen,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-
-                                // Baris 2: Pelanggan & Motor
-                                Text(
-                                  '${trx.customer} • ${trx.vehicle}',
-                                  style: const TextStyle(
-                                    color: textWhite,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 5),
-
-                                // Baris 3: Layanan Servis & Tombol Lingkaran Chevron
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        trx.service,
-                                        style: const TextStyle(
-                                          color: textMuted,
-                                          fontSize: 11,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF1D2333),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.chevron_right_rounded,
-                                        color: textMuted,
-                                        size: 16,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
+            // 4. Quick Duration Pills: 1 Hari | 7 Hari | 30 Hari
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _activeTab == 0
+                  ? SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildQuickPill('1 Hari'),
+                          const SizedBox(width: 8),
+                          _buildQuickPill('7 Hari'),
+                          const SizedBox(width: 8),
+                          _buildQuickPill('30 Hari'),
+                          const SizedBox(width: 14),
+                          Container(width: 1, height: 16, color: cardBorder),
+                          const SizedBox(width: 14),
+                          _buildPaymentChip('Semua'),
+                          const SizedBox(width: 6),
+                          _buildPaymentChip('QRIS'),
+                          const SizedBox(width: 6),
+                          _buildPaymentChip('TUNAI'),
+                        ],
+                      ),
+                    )
+                  : Row(
+                      children: [
+                        _buildQuickPill('1 Hari', isExpanded: true),
+                        const SizedBox(width: 8),
+                        _buildQuickPill('7 Hari', isExpanded: true),
+                        const SizedBox(width: 8),
+                        _buildQuickPill('30 Hari', isExpanded: true),
+                      ],
                     ),
             ),
+            const SizedBox(height: 10),
 
-            // 7. Tombol Tambah Transaksi Baru (Sticky Red Button di atas Bottom Nav)
+            // 5. Daftar Transaksi (Tab 0: Penjualan / Tab 1: Pembelian)
+            Expanded(
+              child: _activeTab == 0
+                  ? _buildSalesList(filteredSales)
+                  : _buildPurchasesList(filteredPurchases),
+            ),
+
+            // 6. Sticky Red Button (Tambah Transaksi / Tambah Pembelian)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
               child: SizedBox(
@@ -714,19 +880,23 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
                 height: 48,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => KasirTransaksiPage(
-                          userData: widget.userData,
+                    if (_activeTab == 0) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => KasirTransaksiPage(
+                            userData: widget.userData,
+                          ),
                         ),
-                      ),
-                    );
+                      );
+                    } else {
+                      _openTambahPembelian();
+                    }
                   },
                   icon: const Icon(Icons.add, color: textWhite, size: 20),
-                  label: const Text(
-                    'Tambah Transaksi Baru',
-                    style: TextStyle(
+                  label: Text(
+                    _activeTab == 0 ? 'Tambah Transaksi Baru' : 'Tambah Pembelian Baru',
+                    style: const TextStyle(
                       color: textWhite,
                       fontSize: 13.5,
                       fontWeight: FontWeight.bold,
@@ -754,13 +924,13 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
     );
   }
 
-  // --- SUB-WIDGET KOMPONEN ---
+  // --- KOMPONEN WIDGET ---
 
-  Widget _buildModeSegment(String modeKey, String label) {
-    final isSelected = _periodMode == modeKey;
+  Widget _buildMainTabSegment(int index, String title) {
+    final isSelected = _activeTab == index;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _periodMode = modeKey),
+        onTap: () => setState(() => _activeTab = index),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -770,12 +940,14 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
           ),
           child: Center(
             child: Text(
-              label,
+              title,
               style: TextStyle(
                 color: isSelected ? textWhite : textMuted,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ),
@@ -783,417 +955,70 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
     );
   }
 
-  /// Kontrol DateTime bergaya HTML Input `<input type="date">` / `<input type="month">`
-  Widget _buildHtmlTimeControl() {
-    if (_periodMode == '1 Hari') {
-      final hasDate = _selectedDate != null;
-      final dayStr = hasDate ? _getDayName(_selectedDate!) : '';
-      final dateStr = hasDate
-          ? '$dayStr, ${_formatDateShort(_selectedDate!)}'
-          : 'Semua Hari (Pilih Tanggal)';
-
-      return GestureDetector(
-        onTap: _openDatePicker,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: inputBg,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: hasDate ? accentRed.withValues(alpha: 0.6) : cardBorder,
-              width: 1.2,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0x22FF1E27),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.calendar_today_rounded,
-                  color: accentRed,
-                  size: 16,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'PILIH TANGGAL (HTML DATETIME)',
-                      style: TextStyle(
-                        color: textDim,
-                        fontSize: 9,
-                        letterSpacing: 0.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      dateStr,
-                      style: TextStyle(
-                        color: hasDate ? textWhite : textMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (hasDate)
-                GestureDetector(
-                  onTap: () => setState(() => _selectedDate = null),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4),
-                    child: Icon(Icons.close_rounded, color: textDim, size: 16),
-                  ),
-                ),
-              const Icon(Icons.edit_calendar_rounded,
-                  color: textDim, size: 18),
-            ],
-          ),
-        ),
-      );
-    } else if (_periodMode == 'Rentang') {
-      final hasRange = _selectedDateRange != null;
-      final rangeStr = hasRange
-          ? '${_formatDateShort(_selectedDateRange!.start)} ➔ ${_formatDateShort(_selectedDateRange!.end)}'
-          : 'Semua Rentang Waktu';
-
-      return GestureDetector(
-        onTap: _openDateRangePicker,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: inputBg,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: hasRange ? accentBlue.withValues(alpha: 0.6) : cardBorder,
-              width: 1.2,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0x2238BDF8),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.date_range_rounded,
-                  color: accentBlue,
-                  size: 16,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'RENTANG TANGGAL (RANGE PICKER)',
-                      style: TextStyle(
-                        color: textDim,
-                        fontSize: 9,
-                        letterSpacing: 0.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      rangeStr,
-                      style: TextStyle(
-                        color: hasRange ? textWhite : textMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (hasRange)
-                GestureDetector(
-                  onTap: () => setState(() => _selectedDateRange = null),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4),
-                    child: Icon(Icons.close_rounded, color: textDim, size: 16),
-                  ),
-                ),
-              const Icon(Icons.keyboard_arrow_down_rounded,
-                  color: textDim, size: 20),
-            ],
-          ),
-        ),
-      );
-    } else {
-      // Mode 'Bulanan' (<input type="month"> style dengan tombol Prev & Next)
-      final hasMonth = _selectedMonth != null;
-      final monthStr = hasMonth
-          ? _formatMonthYear(_selectedMonth!)
-          : 'Semua Bulan (Semua Transaksi)';
-
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: inputBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: hasMonth ? accentGreen.withValues(alpha: 0.5) : cardBorder,
-            width: 1.2,
-          ),
-        ),
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.chevron_left_rounded,
-                  color: textWhite, size: 22),
-              onPressed: () {
-                final curr = _selectedMonth ?? DateTime(2026, 9, 1);
-                setState(() {
-                  _selectedMonth = DateTime(curr.year, curr.month - 1, 1);
-                });
-              },
-            ),
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'BULAN TRANSAKSI (<input type="month">)',
-                      style: TextStyle(
-                        color: textDim,
-                        fontSize: 8.5,
-                        letterSpacing: 0.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      monthStr,
-                      style: const TextStyle(
-                        color: textWhite,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.chevron_right_rounded,
-                  color: textWhite, size: 22),
-              onPressed: () {
-                final curr = _selectedMonth ?? DateTime(2026, 9, 1);
-                setState(() {
-                  _selectedMonth = DateTime(curr.year, curr.month + 1, 1);
-                });
-              },
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
-  /// Quick Bubble Bar untuk akses cepat hari / rentang / bulan
-  Widget _buildQuickBubbleBar() {
-    if (_periodMode == '1 Hari') {
-      final quickDays = [
-        {'label': 'Semua Hari', 'date': null},
-        {'label': 'Sabtu (20/9)', 'date': DateTime(2026, 9, 20)},
-        {'label': 'Jumat (19/9)', 'date': DateTime(2026, 9, 19)},
-        {'label': 'Kamis (18/9)', 'date': DateTime(2026, 9, 18)},
-        {'label': 'Rabu (17/9)', 'date': DateTime(2026, 9, 17)},
-        {'label': 'Selasa (16/9)', 'date': DateTime(2026, 9, 16)},
-        {'label': 'Senin (15/9)', 'date': DateTime(2026, 9, 15)},
-      ];
-
-      return ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: quickDays.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final item = quickDays[index];
-          final date = item['date'] as DateTime?;
-          final label = item['label'] as String;
-
-          final isSelected = (date == null && _selectedDate == null) ||
-              (date != null &&
-                  _selectedDate != null &&
-                  _selectedDate!.year == date.year &&
-                  _selectedDate!.month == date.month &&
-                  _selectedDate!.day == date.day);
-
-          final count = date != null ? _countForDate(date) : null;
-
-          return _buildBubbleChip(
-            label: label,
-            isSelected: isSelected,
-            count: count,
-            onTap: () => setState(() => _selectedDate = date),
-          );
-        },
-      );
-    } else if (_periodMode == 'Rentang') {
-      final quickRanges = [
-        {'label': 'Semua Rentang', 'range': null},
-        {
-          'label': '7 Hari Terakhir',
-          'range': DateTimeRange(
-            start: DateTime(2026, 9, 14),
-            end: DateTime(2026, 9, 20),
-          )
-        },
-        {
-          'label': 'September 2026',
-          'range': DateTimeRange(
-            start: DateTime(2026, 9, 1),
-            end: DateTime(2026, 9, 30),
-          )
-        },
-        {
-          'label': 'Agustus 2026',
-          'range': DateTimeRange(
-            start: DateTime(2026, 8, 1),
-            end: DateTime(2026, 8, 31),
-          )
-        },
-      ];
-
-      return ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: quickRanges.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final item = quickRanges[index];
-          final range = item['range'] as DateTimeRange?;
-          final label = item['label'] as String;
-
-          final isSelected = (range == null && _selectedDateRange == null) ||
-              (range != null &&
-                  _selectedDateRange != null &&
-                  _selectedDateRange!.start.day == range.start.day &&
-                  _selectedDateRange!.end.day == range.end.day &&
-                  _selectedDateRange!.start.month == range.start.month);
-
-          return _buildBubbleChip(
-            label: label,
-            isSelected: isSelected,
-            onTap: () => setState(() => _selectedDateRange = range),
-          );
-        },
-      );
-    } else {
-      // Bulanan
-      final quickMonths = [
-        {'label': 'Semua Bulan', 'month': null},
-        {'label': 'September 2026', 'month': DateTime(2026, 9, 1)},
-        {'label': 'Agustus 2026', 'month': DateTime(2026, 8, 1)},
-        {'label': 'Juli 2026', 'month': DateTime(2026, 7, 1)},
-      ];
-
-      return ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: quickMonths.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final item = quickMonths[index];
-          final m = item['month'] as DateTime?;
-          final label = item['label'] as String;
-
-          final isSelected = (m == null && _selectedMonth == null) ||
-              (m != null &&
-                  _selectedMonth != null &&
-                  _selectedMonth!.year == m.year &&
-                  _selectedMonth!.month == m.month);
-
-          final count = m != null ? _countForMonth(m) : null;
-
-          return _buildBubbleChip(
-            label: label,
-            isSelected: isSelected,
-            count: count,
-            onTap: () => setState(() => _selectedMonth = m),
-          );
-        },
-      );
-    }
-  }
-
-  Widget _buildBubbleChip({
+  Widget _buildDateBox({
     required String label,
-    required bool isSelected,
+    required String dateStr,
     required VoidCallback onTap,
-    int? count,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? accentRed : cardBg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isSelected ? accentRed : cardBorder,
-            width: 1,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: accentRed.withValues(alpha: 0.35),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
+          color: inputBg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: cardBorder),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? textWhite : textMuted,
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(color: textDim, fontSize: 8.5)),
+                  const SizedBox(height: 2),
+                  Text(
+                    dateStr,
+                    style: const TextStyle(color: textWhite, fontSize: 11.5, fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
             ),
-            if (count != null && count > 0) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? Colors.white.withValues(alpha: 0.25)
-                      : const Color(0xFF1D2333),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    color: isSelected ? textWhite : textDim,
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
+            const Icon(Icons.calendar_today_rounded, color: textDim, size: 14),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildQuickPill(String label, {bool isExpanded = false}) {
+    final isSelected = _selectedQuickPeriod == label;
+    final content = GestureDetector(
+      onTap: () => _applyQuickPeriod(label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? accentRed : cardBg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isSelected ? accentRed : cardBorder),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? textWhite : textMuted,
+              fontSize: 10.5,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (isExpanded) {
+      return Expanded(child: content);
+    }
+    return content;
   }
 
   Widget _buildPaymentChip(String payment) {
@@ -1201,20 +1026,20 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
     return GestureDetector(
       onTap: () => setState(() => _selectedPayment = payment),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF16253B) : const Color(0xFF10131B),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: isSelected ? accentBlue : cardBorder,
-            width: 1,
+            width: 0.8,
           ),
         ),
         child: Text(
           payment,
           style: TextStyle(
             color: isSelected ? accentBlue : textDim,
-            fontSize: 10.5,
+            fontSize: 9.5,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
           ),
         ),
@@ -1222,7 +1047,230 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
     );
   }
 
-  Widget _buildEmptyState() {
+  // --- LIST TRANSAKSI PENJUALAN (Screen 12) ---
+  Widget _buildSalesList(List<TransaksiRecord> list) {
+    if (list.isEmpty) return _buildEmptyState('Tidak ada transaksi penjualan pada periode ini.');
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(20, 2, 20, 16),
+      itemCount: list.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final trx = list[index];
+        final isQris = trx.payment == 'QRIS';
+
+        return InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => NotaPembayaranPage(
+                  noNota: trx.code,
+                  waktu: trx.timeFormatted,
+                  pelanggan: '${trx.customer} (${trx.vehicle})',
+                  kasir: widget.userData?['nama_lengkap'] ?? 'Sri Ekowati',
+                  items: [
+                    KasirItemModel(
+                      id: '1',
+                      name: trx.service,
+                      category: 'Layanan Servis',
+                      subInfo: 'Transaksi Kasir',
+                      price: trx.amount,
+                      quantity: 1,
+                      isService: true,
+                    ),
+                  ],
+                  totalBayar: trx.amount,
+                  tunaiDiterima: trx.amount,
+                  paymentMethod: isQris ? 'QRIS' : 'Tunai',
+                  userData: widget.userData,
+                ),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: cardBorder, width: 1),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '${trx.code} • ${trx.timeFormatted}',
+                      style: const TextStyle(
+                        color: textDim,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isQris ? const Color(0xFF0C243B) : const Color(0xFF0F2E1E),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isQris ? const Color(0xFF1E40AF) : const Color(0xFF166534),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        trx.payment,
+                        style: TextStyle(
+                          color: isQris ? accentBlue : accentGreen,
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      _formatRupiah(trx.amount),
+                      style: const TextStyle(
+                        color: accentGreen,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${trx.customer} • ${trx.vehicle}',
+                  style: const TextStyle(
+                    color: textWhite,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        trx.service,
+                        style: const TextStyle(color: textMuted, fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('›', style: TextStyle(color: textMuted, fontSize: 16)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // --- LIST TRANSAKSI PEMBELIAN (Screen 12B) ---
+  Widget _buildPurchasesList(List<PembelianRecord> list) {
+    if (list.isEmpty) return _buildEmptyState('Tidak ada transaksi pembelian pada periode ini.');
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(20, 2, 20, 16),
+      itemCount: list.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final item = list[index];
+
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: cardBorder, width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Row 1: Code & Date, Badge LUNAS, Total Amount (Merah)
+              Row(
+                children: [
+                  Text(
+                    '${item.code} • ${item.dateFormatted}',
+                    style: const TextStyle(
+                      color: textMuted,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F2E1E),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFF166534), width: 0.8),
+                    ),
+                    child: const Text(
+                      'LUNAS',
+                      style: TextStyle(
+                        color: accentGreen,
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    _formatRupiah(item.totalAmount),
+                    style: const TextStyle(
+                      color: Color(0xFFF87171),
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Row 2: Buyer & Supplier
+              Text(
+                '${item.buyerName} • ${item.supplier}',
+                style: const TextStyle(
+                  color: textWhite,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 5),
+
+              // Row 3: Items summary & Chevron
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.summaryItems,
+                      style: const TextStyle(
+                        color: textMuted,
+                        fontSize: 10.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('›', style: TextStyle(color: textMuted, fontSize: 16)),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState(String msg) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1234,45 +1282,13 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
               shape: BoxShape.circle,
               border: Border.all(color: cardBorder),
             ),
-            child: const Icon(
-              Icons.calendar_month_outlined,
-              color: textDim,
-              size: 38,
-            ),
+            child: const Icon(Icons.receipt_long_outlined, color: textDim, size: 36),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Tidak ada transaksi pada tanggal / periode ini.',
-            style: TextStyle(
-              color: textWhite,
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Ganti tanggal kalender atau setel filter ke Semua Hari.',
-            style: TextStyle(color: textDim, fontSize: 11),
-          ),
-          const SizedBox(height: 14),
-          OutlinedButton(
-            onPressed: () {
-              setState(() {
-                _selectedDate = null;
-                _selectedDateRange = null;
-                _selectedMonth = null;
-                _selectedPayment = 'Semua';
-              });
-            },
-            style: OutlinedButton.styleFrom(
-              foregroundColor: textWhite,
-              side: const BorderSide(color: cardBorder),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            child: const Text('Reset Filter & Tampilkan Semua',
-                style: TextStyle(fontSize: 11.5)),
+          Text(
+            msg,
+            style: const TextStyle(color: textMuted, fontSize: 12),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

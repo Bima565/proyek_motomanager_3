@@ -147,15 +147,6 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
     return 'Rp ${buffer.toString().split('').reversed.join('')}';
   }
 
-  void _updateStock(SparepartModel item, int delta) {
-    setState(() {
-      final newStock = item.stock + delta;
-      if (newStock >= 0) {
-        item.stock = newStock;
-      }
-    });
-  }
-
   void _openTambahSparepart() async {
     final result = await Navigator.push<SparepartModel>(
       context,
@@ -378,15 +369,19 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
   Widget _buildSparepartCard(SparepartModel item) {
     Color iconBorderColor;
     Color stockBadgeColor;
+    Color stockBadgeBg;
     if (item.isCritical) {
       iconBorderColor = accentRed;
       stockBadgeColor = accentRed;
+      stockBadgeBg = const Color(0xFF3A161B);
     } else if (item.isWarning) {
       iconBorderColor = accentYellow;
       stockBadgeColor = accentYellow;
+      stockBadgeBg = const Color(0xFF3A2F16);
     } else {
       iconBorderColor = accentGreen;
       stockBadgeColor = accentGreen;
+      stockBadgeBg = const Color(0xFF132F1F);
     }
 
     return Container(
@@ -474,87 +469,55 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
               ],
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
 
-          // 3. Kolom Kontrol Stok & Kebab Menu
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          // 3. Badge Stok & Tombol Kebab Action Sesuai Penpot Screen 5
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Badge Stok
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: stockBadgeColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: stockBadgeColor.withValues(alpha: 0.5),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      '${item.stock} ${item.unit}',
-                      style: TextStyle(
-                        color: stockBadgeColor,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-
-                  // Kebab Menu ⋮
-                  GestureDetector(
-                    onTap: () => _showItemActions(item),
-                    child: const Icon(Icons.more_vert_rounded, color: textDim, size: 18),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Tombol Pengatur Jumlah [-] [+]
+              // Badge Stok
               Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1D2333),
-                  borderRadius: BorderRadius.circular(8),
+                  color: stockBadgeBg,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: stockBadgeColor,
+                    width: 0.8,
+                  ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    InkWell(
-                      onTap: () => _updateStock(item, -1),
-                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                        child: Text(
-                          '-',
-                          style: TextStyle(
-                            color: textWhite,
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                child: Text(
+                  '${item.stock} ${item.unit}',
+                  style: TextStyle(
+                    color: stockBadgeColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Tombol Kebab Action [ ⋮ ]
+              GestureDetector(
+                onTap: () => _showItemActions(item),
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E2333),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: const Color(0xFF2D3548),
+                      width: 0.8,
                     ),
-                    Container(width: 1, height: 16, color: cardBorder),
-                    InkWell(
-                      onTap: () => _updateStock(item, 1),
-                      borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                        child: Text(
-                          '+',
-                          style: TextStyle(
-                            color: textWhite,
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.more_vert_rounded,
+                      color: Color(0xFF94A3B8),
+                      size: 14,
                     ),
-                  ],
+                  ),
                 ),
               ),
             ],
