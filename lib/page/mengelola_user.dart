@@ -4,8 +4,13 @@ import '../hooks/firebase_auth.dart';
 
 class MengelolaUserPage extends StatefulWidget {
   final Map<String, dynamic>? userData;
+  final bool showBottomNav;
 
-  const MengelolaUserPage({super.key, this.userData});
+  const MengelolaUserPage({
+    super.key,
+    this.userData,
+    this.showBottomNav = true,
+  });
 
   @override
   State<MengelolaUserPage> createState() => _MengelolaUserPageState();
@@ -683,28 +688,35 @@ class _MengelolaUserPageState extends State<MengelolaUserPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'Kelola Pengguna',
-                        style: TextStyle(
-                          color: textWhite,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Kelola Pengguna',
+                          style: TextStyle(
+                            color: textWhite,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Kelola Akun Kasir & Administrator Sistem',
-                        style: TextStyle(
-                          color: textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
+                        SizedBox(height: 4),
+                        Text(
+                          'Kelola Akun Kasir & Administrator Sistem',
+                          style: TextStyle(
+                            color: textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: accentRed,
@@ -890,10 +902,12 @@ class _MengelolaUserPageState extends State<MengelolaUserPage> {
           ),
         ),
       ),
-      bottomNavigationBar: MotoBottomNav(
-        currentIndex: 4,
-        userData: _liveUserData ?? widget.userData,
-      ),
+      bottomNavigationBar: (widget.showBottomNav == true)
+          ? MotoBottomNav(
+              currentIndex: 4,
+              userData: _liveUserData ?? widget.userData,
+            )
+          : null,
     );
   }
 }

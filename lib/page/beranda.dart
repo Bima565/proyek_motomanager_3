@@ -3,8 +3,10 @@ import '../components/create_password_dialog.dart';
 import '../components/moto_bottom_nav.dart';
 import '../hooks/firebase_auth.dart';
 import 'data_sparepart.dart';
+import 'kelola_stok_jasa.dart';
 import 'laporan_pendapatan.dart';
 import 'login.dart';
+import 'mengelola_user.dart';
 import 'profil.dart';
 import 'riwayat_transaksi.dart';
 
@@ -25,6 +27,8 @@ class BerandaPage extends StatefulWidget {
 class _BerandaPageState extends State<BerandaPage> {
   final AuthService _authService = AuthService();
   Map<String, dynamic>? _liveUserData;
+  late int _currentNavIndex;
+  bool _isForward = true;
 
   // Warna Design System Penpot MotoManage
   static const Color bgDark = Color(0xFF0E1015);
@@ -41,19 +45,26 @@ class _BerandaPageState extends State<BerandaPage> {
   @override
   void initState() {
     super.initState();
+    _currentNavIndex = widget.initialIndex;
     _loadLiveUserData();
     _checkPasswordStatus();
   }
 
-  void _navigateToPage(Widget page) {
-    Navigator.pushReplacement(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => page,
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
-      ),
-    );
+  bool get _isSuperAdmin {
+    final role = ((_liveUserData ?? widget.userData)?['role'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[\s_-]'), '');
+    return role == 'superadmin';
+  }
+
+  void _switchTab(int index) {
+    if (index == _currentNavIndex) return;
+    setState(() {
+      _isForward = index > _currentNavIndex;
+      _currentNavIndex = index;
+    });
   }
 
   void _checkPasswordStatus() async {
@@ -112,6 +123,69 @@ class _BerandaPageState extends State<BerandaPage> {
     return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
   }
 
+  Widget _buildActiveTab(bool isSuperAdmin, String initials, String username, String role, String email) {
+    final effectiveData = _liveUserData ?? widget.userData;
+
+    if (isSuperAdmin) {
+      switch (_currentNavIndex) {
+        case 0:
+          return _buildBerandaContent(initials, username, role, email);
+        case 1:
+          return RiwayatTransaksiPage(
+            userData: effectiveData,
+            showBottomNav: false,
+          );
+        case 2:
+          return KelolaStokJasaPage(
+            userData: effectiveData,
+            showBottomNav: false,
+          );
+        case 3:
+          return LaporanPendapatanPage(
+            userData: effectiveData,
+            showBottomNav: false,
+          );
+        case 4:
+          return MengelolaUserPage(
+            userData: effectiveData,
+            showBottomNav: false,
+          );
+        case 5:
+        default:
+          return ProfilPage(
+            userData: effectiveData,
+            showBottomNav: false,
+          );
+      }
+    } else {
+      switch (_currentNavIndex) {
+        case 0:
+          return _buildBerandaContent(initials, username, role, email);
+        case 1:
+          return RiwayatTransaksiPage(
+            userData: effectiveData,
+            showBottomNav: false,
+          );
+        case 2:
+          return KelolaStokJasaPage(
+            userData: effectiveData,
+            showBottomNav: false,
+          );
+        case 3:
+          return LaporanPendapatanPage(
+            userData: effectiveData,
+            showBottomNav: false,
+          );
+        case 4:
+        default:
+          return ProfilPage(
+            userData: effectiveData,
+            showBottomNav: false,
+          );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = _authService.currentUser;
@@ -125,46 +199,79 @@ class _BerandaPageState extends State<BerandaPage> {
         'Pengguna';
     final String role = _liveUserData?['role'] ?? widget.userData?['role'] ?? 'Kasir';
     final String initials = _getUserInitials(username);
+    final isSuperAdmin = _isSuperAdmin;
 
     return Scaffold(
       backgroundColor: bgDark,
-      body: SafeArea(
-        bottom: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(initials, username, role, email),
-              const SizedBox(height: 20),
-              _buildOmzetCard('Rp 140.000'),
-              const SizedBox(height: 16),
-              _buildChartCard(),
-              const SizedBox(height: 24),
-              _buildStokMenipisSection(),
-              const SizedBox(height: 24),
-              _buildTransaksiTerakhirSection(),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        layoutBuilder: (currentChild, previousChildren) {
+          return Stack(
+            children: <Widget>[
+              ...previousChildren,
+              ?currentChild,
             ],
-          ),
+          );
+        },
+        transitionBuilder: (child, animation) {
+          final bool isIncoming = child.key == ValueKey(_currentNavIndex);
+          final begin = Offset(
+            isIncoming
+                ? (_isForward ? 1.0 : -1.0)
+                : (_isForward ? -1.0 : 1.0),
+            0.0,
+          );
+          return SlideTransition(
+            position: Tween<Offset>(begin: begin, end: Offset.zero).animate(animation),
+            child: child,
+          );
+        },
+        child: KeyedSubtree(
+          key: ValueKey(_currentNavIndex),
+          child: _buildActiveTab(isSuperAdmin, initials, username, role, email),
         ),
       ),
       bottomNavigationBar: MotoBottomNav(
-        currentIndex: 0,
+        currentIndex: _currentNavIndex,
         userData: _liveUserData ?? widget.userData,
+        onTabSelected: _switchTab,
       ),
     );
   }
 
   // --- WIDGET KOMPONEN ---
 
+  Widget _buildBerandaContent(String initials, String username, String role, String email) {
+    return SafeArea(
+      bottom: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(initials, username, role, email),
+            const SizedBox(height: 20),
+            _buildOmzetCard('Rp 140.000'),
+            const SizedBox(height: 16),
+            _buildChartCard(),
+            const SizedBox(height: 24),
+            _buildStokMenipisSection(),
+            const SizedBox(height: 24),
+            _buildTransaksiTerakhirSection(),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader(String initials, String username, String role, String email) {
     return Row(
       children: [
         // Lingkaran Avatar dengan Border Merah
         GestureDetector(
-          onTap: () => _navigateToPage(
-            ProfilPage(userData: _liveUserData ?? widget.userData),
-          ),
+          onTap: () => _switchTab(_isSuperAdmin ? 5 : 4),
           child: Container(
             width: 48,
             height: 48,
@@ -227,9 +334,7 @@ class _BerandaPageState extends State<BerandaPage> {
 
   Widget _buildOmzetCard(String nominal) {
     return GestureDetector(
-      onTap: () => _navigateToPage(
-        LaporanPendapatanPage(userData: _liveUserData ?? widget.userData),
-      ),
+      onTap: () => _switchTab(3),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
@@ -310,11 +415,7 @@ class _BerandaPageState extends State<BerandaPage> {
               const SizedBox(width: 8),
               // Tombol Detail
               GestureDetector(
-                onTap: () => _navigateToPage(
-                  LaporanPendapatanPage(
-                    userData: _liveUserData ?? widget.userData,
-                  ),
-                ),
+                onTap: () => _switchTab(3),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
                   decoration: BoxDecoration(
@@ -571,9 +672,7 @@ class _BerandaPageState extends State<BerandaPage> {
         const SizedBox(height: 12),
 
         GestureDetector(
-          onTap: () => _navigateToPage(
-            RiwayatTransaksiPage(userData: _liveUserData ?? widget.userData),
-          ),
+          onTap: () => _switchTab(1),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(

@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 import '../hooks/firebase_auth.dart';
 import '../page/beranda.dart';
-import '../page/kelola_stok_jasa.dart';
-import '../page/laporan_pendapatan.dart';
-import '../page/mengelola_user.dart';
-import '../page/profil.dart';
-import '../page/riwayat_transaksi.dart';
 
 class MotoBottomNav extends StatefulWidget {
   final int currentIndex;
@@ -69,56 +64,13 @@ class _MotoBottomNavState extends State<MotoBottomNav> {
       return;
     }
 
-    Widget targetPage;
-    if (_isSuperAdmin) {
-      switch (index) {
-        case 0:
-          targetPage = BerandaPage(userData: _effectiveUserData, initialIndex: 0);
-          break;
-        case 1:
-          targetPage = RiwayatTransaksiPage(userData: _effectiveUserData);
-          break;
-        case 2:
-          targetPage = KelolaStokJasaPage(userData: _effectiveUserData);
-          break;
-        case 3:
-          targetPage = LaporanPendapatanPage(userData: _effectiveUserData);
-          break;
-        case 4:
-          targetPage = MengelolaUserPage(userData: _effectiveUserData);
-          break;
-        case 5:
-          targetPage = ProfilPage(userData: _effectiveUserData);
-          break;
-        default:
-          return;
-      }
-    } else {
-      switch (index) {
-        case 0:
-          targetPage = BerandaPage(userData: _effectiveUserData, initialIndex: 0);
-          break;
-        case 1:
-          targetPage = RiwayatTransaksiPage(userData: _effectiveUserData);
-          break;
-        case 2:
-          targetPage = KelolaStokJasaPage(userData: _effectiveUserData);
-          break;
-        case 3:
-          targetPage = LaporanPendapatanPage(userData: _effectiveUserData);
-          break;
-        case 4:
-          targetPage = ProfilPage(userData: _effectiveUserData);
-          break;
-        default:
-          return;
-      }
-    }
-
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => targetPage,
+        pageBuilder: (context, animation, secondaryAnimation) => BerandaPage(
+          userData: _effectiveUserData,
+          initialIndex: index,
+        ),
         transitionDuration: Duration.zero,
         reverseTransitionDuration: Duration.zero,
       ),

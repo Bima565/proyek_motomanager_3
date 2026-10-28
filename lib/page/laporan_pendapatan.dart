@@ -49,14 +49,19 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Laporan Pendapatan',
-                    style: TextStyle(
-                      color: textWhite,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
+                  const Expanded(
+                    child: Text(
+                      'Laporan Pendapatan',
+                      style: TextStyle(
+                        color: textWhite,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                     decoration: BoxDecoration(
@@ -351,27 +356,30 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    '• Jasa Servis Motor (38 servis)',
-                    style: TextStyle(
-                      color: Color(0xFFFF1E27),
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.bold,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      '• Jasa Servis Motor (38 servis)',
+                      style: TextStyle(
+                        color: Color(0xFFFF1E27),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    '100% Laba Jasa (Tanpa modal part)',
-                    style: TextStyle(
-                      color: textDim,
-                      fontSize: 9.5,
+                    SizedBox(height: 2),
+                    Text(
+                      '100% Laba Jasa (Tanpa modal part)',
+                      style: TextStyle(
+                        color: textDim,
+                        fontSize: 9.5,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               const Text(
                 '+ Rp 1.240.000',
                 style: TextStyle(
@@ -396,28 +404,33 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'LABA KOTOR BENGKEL',
-                      style: TextStyle(
-                        color: textWhite,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'LABA KOTOR BENGKEL',
+                        style: TextStyle(
+                          color: textWhite,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.3,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Untung Part (460rb) + Jasa (1.240rb)',
-                      style: TextStyle(
-                        color: textDim,
-                        fontSize: 9.5,
+                      SizedBox(height: 2),
+                      Text(
+                        'Untung Part (460rb) + Jasa (1.240rb)',
+                        style: TextStyle(
+                          color: textDim,
+                          fontSize: 9.5,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: const [
@@ -466,29 +479,34 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'LABA BERSIH (NET PROFIT)',
-                      style: TextStyle(
-                        color: textWhite,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'LABA BERSIH (NET PROFIT)',
+                        style: TextStyle(
+                          color: textWhite,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.3,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Laba Kotor - Beban Operasional',
-                      style: TextStyle(
-                        color: accentGreen,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w500,
+                      SizedBox(height: 2),
+                      Text(
+                        'Laba Kotor - Beban Operasional',
+                        style: TextStyle(
+                          color: accentGreen,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: const [
@@ -523,14 +541,19 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: labelColor,
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: labelColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
+        const SizedBox(width: 8),
         Text(
           value,
           style: TextStyle(
@@ -764,13 +787,13 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                _buildBarCol('Sen', '75k', 0.55, 0.45, false),
-                _buildBarCol('Sel', '85k', 0.65, 0.50, false),
-                _buildBarCol('Rab', '80k', 0.60, 0.55, false),
-                _buildBarCol('Kam', '95k', 0.70, 0.65, false),
-                _buildBarCol('Jum', '90k', 0.68, 0.60, false),
-                _buildBarCol('Sab', '140k', 1.0, 0.85, true),
-                _buildBarCol('Min', '110k', 0.78, 0.72, false),
+                Expanded(child: _buildBarCol('Sen', '75k', 0.55, 0.45, false)),
+                Expanded(child: _buildBarCol('Sel', '85k', 0.65, 0.50, false)),
+                Expanded(child: _buildBarCol('Rab', '80k', 0.60, 0.55, false)),
+                Expanded(child: _buildBarCol('Kam', '95k', 0.70, 0.65, false)),
+                Expanded(child: _buildBarCol('Jum', '90k', 0.68, 0.60, false)),
+                Expanded(child: _buildBarCol('Sab', '140k', 1.0, 0.85, true)),
+                Expanded(child: _buildBarCol('Min', '110k', 0.78, 0.72, false)),
               ],
             ),
           ),
