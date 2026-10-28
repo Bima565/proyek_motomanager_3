@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -477,7 +478,7 @@ class AuthService {
     });
   }
 
-  /// 7. TAMBAHKAN USER BARU KE FIRESTORE
+  /// 7. TAMBAHKAN USER BARU KE FIRESTORE & FIREBASE AUTH
   Future<void> addNewUser({
     required String namaLengkap,
     required String email,
@@ -487,6 +488,27 @@ class AuthService {
   }) async {
     final cleanEmail = email.trim().toLowerCase();
     final cleanName = namaLengkap.trim();
+
+    // 1. Jika ada password awal, daftarkan juga ke Firebase Auth via secondary app
+    if (password != null && password.isNotEmpty) {
+      FirebaseApp? tempApp;
+      try {
+        tempApp = await Firebase.initializeApp(
+          name: 'addNewUser_${DateTime.now().millisecondsSinceEpoch}',
+          options: Firebase.app().options,
+        );
+        final tempAuth = FirebaseAuth.instanceFor(app: tempApp);
+        await tempAuth.createUserWithEmailAndPassword(
+          email: cleanEmail,
+          password: password,
+        );
+        await tempAuth.currentUser?.updateDisplayName(cleanName);
+      } catch (e) {
+        debugPrint('Catatan pendaftaran Firebase Auth user baru: $e');
+      } finally {
+        await tempApp?.delete();
+      }
+    }
 
     final newUserData = <String, dynamic>{
       'nama_lengkap': cleanName,
@@ -509,10 +531,12 @@ class AuthService {
     required String email,
     String? role,
     String? noTelepon,
+    String? password,
   }) async {
+    final cleanEmail = email.trim().toLowerCase();
     final updateData = <String, dynamic>{
       'nama_lengkap': namaLengkap.trim(),
-      'email': email.trim().toLowerCase(),
+      'email': cleanEmail,
       'updated_at': FieldValue.serverTimestamp(),
     };
     if (role != null) {
@@ -520,6 +544,26 @@ class AuthService {
     }
     if (noTelepon != null) {
       updateData['no_telepon'] = noTelepon.trim();
+    }
+    if (password != null && password.isNotEmpty) {
+      updateData['has_password'] = true;
+      FirebaseApp? tempApp;
+      try {
+        tempApp = await Firebase.initializeApp(
+          name: 'updateUser_${DateTime.now().millisecondsSinceEpoch}',
+          options: Firebase.app().options,
+        );
+        final tempAuth = FirebaseAuth.instanceFor(app: tempApp);
+        await tempAuth.createUserWithEmailAndPassword(
+          email: cleanEmail,
+          password: password,
+        );
+        await tempAuth.currentUser?.updateDisplayName(namaLengkap.trim());
+      } catch (e) {
+        debugPrint('Catatan sinkronisasi sandi auth: $e');
+      } finally {
+        await tempApp?.delete();
+      }
     }
 
     await _firestore.collection('user').doc(docId).set(
@@ -531,6 +575,79 @@ class AuthService {
   /// 9. HAPUS USER DI FIRESTORE BERDASARKAN DOC ID
   Future<void> deleteUser(String docId) async {
     await _firestore.collection('user').doc(docId).delete();
+  }
+
+  /// 10. SUPERADMIN: KIRIM LINK RESET KATA SANDI KE EMAIL
+  Future<void> adminSendPasswordResetEmail(String email) async {
+    final cleanEmail = email.trim().toLowerCase();
+    await _auth.sendPasswordResetEmail(email: cleanEmail);
+  }
+
+  /// 11. SUPERADMIN: UBAH / RESET KATA SANDI USER
+  Future<String> adminSetUserPassword({
+    required String email,
+    required String newPassword,
+    String? docId,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+    bool authCreated = false;
+
+    // 1. Coba buat akun di Firebase Auth jika akun sebelumnya belum ada di Auth
+    FirebaseApp? tempApp;
+    try {
+      tempApp = await Firebase.initializeApp(
+        name: 'adminReset_${DateTime.now().millisecondsSinceEpoch}',
+        options: Firebase.app().options,
+      );
+      final tempAuth = FirebaseAuth.instanceFor(app: tempApp);
+      await tempAuth.createUserWithEmailAndPassword(
+        email: cleanEmail,
+        password: newPassword,
+      );
+      authCreated = true;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'email-already-in-use') {
+        // Akun sudah ada di Firebase Auth:
+        // Kirimkan link pembaruan sandi resmi Firebase ke email pengguna
+        try {
+          await _auth.sendPasswordResetEmail(email: cleanEmail);
+        } catch (_) {}
+      } else {
+        rethrow;
+      }
+    } finally {
+      await tempApp?.delete();
+    }
+
+    // 2. Update status has_password di Firestore
+    final updateData = <String, dynamic>{
+      'has_password': true,
+      'password': FieldValue.delete(),
+      'updated_at': FieldValue.serverTimestamp(),
+    };
+
+    if (docId != null && docId.isNotEmpty) {
+      await _firestore.collection('user').doc(docId).set(
+        updateData,
+        SetOptions(merge: true),
+      );
+    } else {
+      final querySnapshot = await _firestore
+          .collection('user')
+          .where('email', isEqualTo: cleanEmail)
+          .limit(1)
+          .get();
+      if (querySnapshot.docs.isNotEmpty) {
+        await querySnapshot.docs.first.reference.set(
+          updateData,
+          SetOptions(merge: true),
+        );
+      }
+    }
+
+    return authCreated
+        ? 'Kata sandi berhasil disetel di Firebase Auth!'
+        : 'Status sandi diperbarui & link reset telah dikirim ke $cleanEmail.';
   }
 
   /// 10. LOGOUT

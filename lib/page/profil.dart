@@ -543,6 +543,8 @@ class _ProfilPageState extends State<ProfilPage> {
     final nameController = TextEditingController(text: user['nama_lengkap'] ?? user['name'] ?? '');
     final emailController = TextEditingController(text: user['email'] ?? '');
     final phoneController = TextEditingController(text: user['no_telepon'] ?? user['noTelepon'] ?? '');
+    final passwordController = TextEditingController();
+    bool obscurePassword = true;
     bool isLoading = false;
 
     showDialog(
@@ -612,6 +614,33 @@ class _ProfilPageState extends State<ProfilPage> {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   ),
                 ),
+                const SizedBox(height: 14),
+                const Text('Password Baru', style: TextStyle(color: textMuted, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: passwordController,
+                  obscureText: obscurePassword,
+                  style: const TextStyle(color: textWhite),
+                  decoration: InputDecoration(
+                    hintText: 'Kosongkan jika tidak diubah',
+                    hintStyle: const TextStyle(color: textDim, fontSize: 12),
+                    filled: true,
+                    fillColor: bgDark,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: cardBorder),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        color: textDim,
+                        size: 18,
+                      ),
+                      onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -631,6 +660,7 @@ class _ProfilPageState extends State<ProfilPage> {
                       final name = nameController.text.trim();
                       final email = emailController.text.trim();
                       final phone = phoneController.text.trim();
+                      final pass = passwordController.text.trim();
                       final docId = user['id'];
 
                       if (name.isEmpty || email.isEmpty) return;
@@ -642,6 +672,7 @@ class _ProfilPageState extends State<ProfilPage> {
                           namaLengkap: name,
                           email: email,
                           noTelepon: phone,
+                          password: pass.isNotEmpty ? pass : null,
                         );
 
                         if (mounted) {
