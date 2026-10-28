@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../components/create_password_dialog.dart';
 import '../components/moto_bottom_nav.dart';
 import '../hooks/firebase_auth.dart';
-import 'dasboard.dart';
+import 'profil/dasboard.dart';
 import 'login.dart';
 
 class ProfilPage extends StatefulWidget {

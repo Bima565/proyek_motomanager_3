@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../components/moto_bottom_nav.dart';
-import 'rincian_omzet_6bulan.dart';
-import 'rincian_transaksi_harian.dart';
+import 'beranda/rincian_omzet_6bulan.dart';
+import 'beranda/rincian_transaksi_harian.dart';
 
 /// Screen 7 - (FR09) Laporan Pendapatan & Analitik Bengkel
 class LaporanPendapatanPage extends StatefulWidget {

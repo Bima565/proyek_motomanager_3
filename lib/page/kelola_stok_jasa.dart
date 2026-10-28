@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../components/moto_bottom_nav.dart';
-import 'data_sparepart.dart';
-import 'tambah_sparepart.dart';
+import 'stok/data_sparepart.dart';
+import 'stok/master_jasa.dart';
+import 'stok/tambah_sparepart.dart';
 
 /// Screen 11 - (FR05, FR06) Navigasi Tambah Data Stok & Jasa
 class KelolaStokJasaPage extends StatefulWidget {
@@ -22,7 +23,6 @@ class _KelolaStokJasaPageState extends State<KelolaStokJasaPage> {
   // Warna Design System Penpot MotoManage
   static const Color bgDark = Color(0xFF0E1015);
   static const Color cardBg = Color(0xFF151821);
-  static const Color cardBorder = Color(0xFF222634);
   static const Color accentRed = Color(0xFFFF1E27);
   static const Color accentBlue = Color(0xFF38BDF8);
   static const Color textWhite = Color(0xFFFFFFFF);
@@ -109,10 +109,22 @@ class _KelolaStokJasaPageState extends State<KelolaStokJasaPage> {
                 buttonBg: const Color(0xFF281116),
                 buttonTextColor: const Color(0xFFF87171),
                 onCardTap: () {
-                  _showMasterJasaDialog();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          MasterJasaPage(userData: widget.userData),
+                    ),
+                  );
                 },
                 onButtonTap: () {
-                  _showMasterJasaDialog();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          MasterJasaPage(userData: widget.userData),
+                    ),
+                  );
                 },
               ),
             ],
@@ -231,95 +243,6 @@ class _KelolaStokJasaPageState extends State<KelolaStokJasaPage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showMasterJasaDialog() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        side: BorderSide(color: cardBorder),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: textDim.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Master Layanan Jasa (FR06)',
-              style: TextStyle(
-                color: textWhite,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildServiceItem('Servis Ringan / Tune Up', 'Rp 45.000'),
-            _buildServiceItem('Servis CVT Komplit', 'Rp 65.000'),
-            _buildServiceItem('Ganti Oli Mesin / Gardan', 'Rp 10.000'),
-            _buildServiceItem('Tambal Ban Tubeless', 'Rp 15.000'),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      backgroundColor: Color(0xFF143322),
-                      content: Text('Form Tambah Jasa baru berhasil dibuka'),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Tambah Tarif Jasa Baru'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: accentRed,
-                  foregroundColor: textWhite,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildServiceItem(String name, String price) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(name, style: const TextStyle(color: textWhite, fontSize: 13)),
-          Text(
-            price,
-            style: const TextStyle(
-              color: Color(0xFF22C55E),
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
       ),
     );
   }

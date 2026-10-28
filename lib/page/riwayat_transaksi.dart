@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../components/moto_bottom_nav.dart';
-import 'kasir_transaksi.dart';
-import 'nota_pembayaran.dart';
+import 'transaksi/kasir_transaksi.dart';
+import 'transaksi/nota_pembayaran.dart';
 
 class TransaksiRecord {
   final String code;

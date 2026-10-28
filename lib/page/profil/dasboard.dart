@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../components/create_password_dialog.dart';
-import '../hooks/firebase_auth.dart';
-import 'login.dart';
+import '../../components/create_password_dialog.dart';
+import '../../hooks/firebase_auth.dart';
+import '../login.dart';
 
 class DasboardPage extends StatefulWidget {
   final Map<String, dynamic>? userData;

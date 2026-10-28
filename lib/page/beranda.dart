@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../components/create_password_dialog.dart';
 import '../components/moto_bottom_nav.dart';
 import '../hooks/firebase_auth.dart';
-import 'data_sparepart.dart';
+import 'stok/data_sparepart.dart';
 import 'kelola_stok_jasa.dart';
 import 'laporan_pendapatan.dart';
 import 'login.dart';

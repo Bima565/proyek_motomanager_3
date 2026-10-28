@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../components/moto_bottom_nav.dart';
-import 'beranda.dart';
+import '../../components/moto_bottom_nav.dart';
+import '../beranda.dart';
 import 'tambah_sparepart.dart';
 
 class SparepartModel {
