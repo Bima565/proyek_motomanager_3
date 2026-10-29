@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import '../components/custom_calendar_dialog.dart';
 import '../components/moto_bottom_nav.dart';
 import '../components/rupiah_formatter.dart';
+import '../services/transaksi_service.dart';
 import 'transaksi/kasir_transaksi.dart';
 import 'transaksi/nota_pembayaran.dart';
 import 'transaksi/pengadaan_restock.dart';
 
+// Alias backward compatibility jika ada file lain yang mengacu pada TransaksiRecord
 class TransaksiRecord {
   final String code;
   final DateTime dateTime;
@@ -32,27 +34,6 @@ class TransaksiRecord {
     final h = dateTime.hour.toString().padLeft(2, '0');
     final min = dateTime.minute.toString().padLeft(2, '0');
     return '$h:$min $d/$m/$y';
-  }
-
-  String get dayName {
-    switch (dateTime.weekday) {
-      case DateTime.monday:
-        return 'Senin';
-      case DateTime.tuesday:
-        return 'Selasa';
-      case DateTime.wednesday:
-        return 'Rabu';
-      case DateTime.thursday:
-        return 'Kamis';
-      case DateTime.friday:
-        return 'Jumat';
-      case DateTime.saturday:
-        return 'Sabtu';
-      case DateTime.sunday:
-        return 'Minggu';
-      default:
-        return '';
-    }
   }
 }
 
@@ -88,63 +69,14 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
   int _activeTab = 0;
 
   // Filter Tanggal Rentang Waktu
-  DateTime _startDate = DateTime(2026, 9, 20);
-  DateTime _endDate = DateTime(2026, 10, 26);
+  DateTime _startDate = DateTime(2026, 9, 1);
+  DateTime _endDate = DateTime(2026, 10, 31);
 
   // Quick Period Pill (1 Hari | 7 Hari | 30 Hari | Semua)
   String _selectedQuickPeriod = 'Semua';
 
   // Filter Metode Pembayaran (khusus penjualan): 'Semua' | 'QRIS' | 'TUNAI'
   String _selectedPayment = 'Semua';
-
-  // Seed Data Transaksi Penjualan / Jasa (Screen 12)
-  final List<TransaksiRecord> _salesTransactions = [
-    TransaksiRecord(
-      code: '#TRX-005',
-      dateTime: DateTime(2026, 9, 20, 8, 30),
-      payment: 'QRIS',
-      amount: 40000,
-      customer: 'Dian Pratama',
-      vehicle: 'Yamaha NMAX',
-      service: 'Tambal Tubeless + Cairan Ban',
-    ),
-    TransaksiRecord(
-      code: '#TRX-004',
-      dateTime: DateTime(2026, 9, 20, 10, 15),
-      payment: 'TUNAI',
-      amount: 95000,
-      customer: 'Rudi Hartono',
-      vehicle: 'Honda Supra X 125',
-      service: 'Bersihkan Karburator + Rantai Roda',
-    ),
-    TransaksiRecord(
-      code: '#TRX-003',
-      dateTime: DateTime(2026, 9, 19, 14, 20),
-      payment: 'TUNAI',
-      amount: 80000,
-      customer: 'Ibu Sri Wahyuni',
-      vehicle: 'Yamaha Mio M3',
-      service: 'Ganti Oli Mesin & Gardan',
-    ),
-    TransaksiRecord(
-      code: '#TRX-002',
-      dateTime: DateTime(2026, 9, 18, 11, 0),
-      payment: 'QRIS',
-      amount: 130000,
-      customer: 'Ahmad Fauzi',
-      vehicle: 'Honda Vario 160',
-      service: 'Servis CVT & Rem + Roller + Kampas',
-    ),
-    TransaksiRecord(
-      code: '#TRX-001',
-      dateTime: DateTime(2026, 9, 17, 9, 10),
-      payment: 'TUNAI',
-      amount: 105000,
-      customer: 'Budi Santoso',
-      vehicle: 'Honda Beat FI',
-      service: 'Servis Ringan + Oli MPX2 + Busi',
-    ),
-  ];
 
   // Seed Data Transaksi Pembelian / Restock (Screen 12B)
   final List<PembelianRecord> _purchaseTransactions = [
@@ -158,73 +90,73 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
           id: '1',
           name: 'Velg Jari-jari 125',
           category: 'velg',
-          buyPrice: 90000,
-          quantity: 10,
+          buyPrice: 350000,
+          quantity: 2,
         ),
         RestockItemModel(
           id: '2',
-          name: 'Oli MPX2',
-          category: 'oli',
-          buyPrice: 60000,
-          quantity: 20,
+          name: 'Jari-jari TDR Chrome',
+          category: 'velg',
+          buyPrice: 65000,
+          quantity: 4,
         ),
       ],
-      totalAmount: 2100000,
+      totalAmount: 960000,
       status: 'LUNAS',
     ),
     PembelianRecord(
       code: '#BELI-004',
       dateTime: DateTime(2026, 10, 12),
       buyerName: 'Sugeng Yulianto',
-      supplier: 'PT Astra Motor Parts',
+      supplier: 'CV Maju Motor',
       items: [
         RestockItemModel(
           id: '3',
-          name: 'Kampas Rem Depan',
-          category: 'rem',
-          buyPrice: 40000,
-          quantity: 15,
-        ),
-        RestockItemModel(
-          id: '4',
-          name: 'Busi NGK',
+          name: 'Busi Champion RG6YC',
           category: 'kelistrikan',
-          buyPrice: 20000,
+          buyPrice: 15000,
           quantity: 20,
         ),
       ],
-      totalAmount: 875000,
+      totalAmount: 300000,
       status: 'LUNAS',
     ),
     PembelianRecord(
       code: '#BELI-003',
       dateTime: DateTime(2026, 10, 18),
       buyerName: 'Sugeng Yulianto',
-      supplier: 'Distributor Ban FDR',
+      supplier: 'Distributor Federal',
       items: [
         RestockItemModel(
-          id: '5',
-          name: 'Ban Luar Tubeless FDR 90/90-14',
-          category: 'ban',
-          buyPrice: 150000,
-          quantity: 8,
+          id: '4',
+          name: 'Federal Ultratec 20W-50 0.8L',
+          category: 'oli',
+          buyPrice: 38000,
+          quantity: 24,
         ),
       ],
-      totalAmount: 1480000,
+      totalAmount: 912000,
       status: 'LUNAS',
     ),
     PembelianRecord(
       code: '#BELI-002',
       dateTime: DateTime(2026, 10, 22),
       buyerName: 'Sugeng Yulianto',
-      supplier: 'PT Yamalube Indonesia',
+      supplier: 'PT Astra Otoparts',
       items: [
         RestockItemModel(
+          id: '5',
+          name: 'Kampas Ganda Vario 125/150',
+          category: 'cvt',
+          buyPrice: 95000,
+          quantity: 6,
+        ),
+        RestockItemModel(
           id: '6',
-          name: 'Oli Yamalube Silver 0.8L',
-          category: 'oli',
-          buyPrice: 35000,
-          quantity: 24,
+          name: 'V-Belt Gates Powerlink Beat ESP',
+          category: 'cvt',
+          buyPrice: 90000,
+          quantity: 3,
         ),
       ],
       totalAmount: 840000,
@@ -265,6 +197,7 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
     );
     if (selected != null) {
       setState(() {
+        _selectedQuickPeriod = 'Kustom';
         if (isStart) {
           _startDate = selected;
         } else {
@@ -277,10 +210,10 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
   void _applyQuickPeriod(String period) {
     setState(() {
       _selectedQuickPeriod = period;
-      final now = DateTime(2026, 10, 26);
+      final now = DateTime.now();
       if (period == '1 Hari') {
-        _startDate = now;
-        _endDate = now;
+        _startDate = DateTime(now.year, now.month, now.day);
+        _endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
       } else if (period == '7 Hari') {
         _startDate = now.subtract(const Duration(days: 7));
         _endDate = now;
@@ -288,17 +221,20 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
         _startDate = now.subtract(const Duration(days: 30));
         _endDate = now;
       } else {
-        _startDate = DateTime(2026, 9, 1);
-        _endDate = DateTime(2026, 10, 31);
+        _startDate = DateTime(2020, 1, 1);
+        _endDate = DateTime(2030, 12, 31);
       }
     });
   }
 
-  List<TransaksiRecord> get _filteredSales {
-    return _salesTransactions.where((t) {
+  List<TransaksiPenjualanModel> _filterSales(List<TransaksiPenjualanModel> allList) {
+    return allList.where((t) {
       if (_selectedPayment != 'Semua' &&
-          t.payment.toUpperCase() != _selectedPayment.toUpperCase()) {
+          t.paymentMethod.toUpperCase() != _selectedPayment.toUpperCase()) {
         return false;
+      }
+      if (_selectedQuickPeriod == 'Semua') {
+        return true;
       }
       final dateOnly = DateTime(t.dateTime.year, t.dateTime.month, t.dateTime.day);
       final startOnly = DateTime(_startDate.year, _startDate.month, _startDate.day);
@@ -311,6 +247,9 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
 
   List<PembelianRecord> get _filteredPurchases {
     return _purchaseTransactions.where((p) {
+      if (_selectedQuickPeriod == 'Semua') {
+        return true;
+      }
       final dateOnly = DateTime(p.dateTime.year, p.dateTime.month, p.dateTime.day);
       final startOnly = DateTime(_startDate.year, _startDate.month, _startDate.day);
       final endOnly = DateTime(_endDate.year, _endDate.month, _endDate.day);
@@ -336,7 +275,7 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFF143322),
-            content: Text('Pembelian ${newBeli.code} berhasil disimpan & stok bertambah!'),
+            content: Text('Pembelian baru ${newBeli.code} berhasil dicatat!'),
           ),
         );
       }
@@ -345,195 +284,206 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredSales = _filteredSales;
-    final filteredPurchases = _filteredPurchases;
+    return ValueListenableBuilder<List<TransaksiPenjualanModel>>(
+      valueListenable: TransaksiService().transactionsNotifier,
+      builder: (context, allSalesList, child) {
+        final filteredSales = _filterSales(allSalesList);
+        final filteredPurchases = _filteredPurchases;
 
-    final int totalPenjualan = filteredSales.fold(0, (sum, t) => sum + t.amount);
-    final int totalPembelian = filteredPurchases.fold(0, (sum, p) => sum + p.totalAmount);
+        final int totalPenjualan =
+            filteredSales.fold(0, (total, t) => total + t.totalBayar);
+        final int totalPembelian =
+            filteredPurchases.fold(0, (total, p) => total + p.totalAmount);
 
-    return Scaffold(
-      backgroundColor: bgDark,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // 1. Header (Judul & Subjudul Info)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        return Scaffold(
+          backgroundColor: bgDark,
+          body: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                // 1. Header (Judul & Subjudul Info)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Riwayat Transaksi',
-                        style: TextStyle(
-                          color: textWhite,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Riwayat Transaksi',
+                            style: TextStyle(
+                              color: textWhite,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _activeTab == 0
+                                ? '${filteredSales.length} Transaksi • ${_formatRupiah(totalPenjualan)}'
+                                : '${filteredPurchases.length} Pembelian • ${_formatRupiah(totalPembelian)}',
+                            style: TextStyle(
+                              color: _activeTab == 0 ? accentGreen : const Color(0xFFF87171),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 2. Tab Segmented Sesuai Penpot Screen 12 & Screen 12B
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: cardBorder, width: 1),
+                    ),
+                    child: Row(
+                      children: [
+                        _buildMainTabSegment(0, 'Transaksi Penjualan / Jasa'),
+                        const SizedBox(width: 4),
+                        _buildMainTabSegment(1, 'Transaksi Pembelian'),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // 3. Date Range Selector Bar Pop-up (Start & End Date)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      // Start Date Input Box
+                      Expanded(
+                        child: _buildDateBox(
+                          label: 'Start',
+                          dateStr: _formatDateIso(_startDate),
+                          onTap: () => _openDatePickerPopup(isStart: true),
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _activeTab == 0
-                            ? '${filteredSales.length} Transaksi • ${_formatRupiah(totalPenjualan)}'
-                            : '${filteredPurchases.length} Pembelian • ${_formatRupiah(totalPembelian)}',
-                        style: TextStyle(
-                          color: _activeTab == 0 ? accentGreen : const Color(0xFFF87171),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6),
+                        child: Icon(Icons.arrow_forward_rounded, color: textDim, size: 14),
+                      ),
+                      // End Date Input Box
+                      Expanded(
+                        child: _buildDateBox(
+                          label: 'End',
+                          dateStr: _formatDateIso(_endDate),
+                          onTap: () => _openDatePickerPopup(isStart: false),
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-
-            // 2. Tab Segmented Sesuai Penpot Screen 12 & Screen 12B
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: cardBorder, width: 1),
                 ),
-                child: Row(
-                  children: [
-                    _buildMainTabSegment(0, 'Transaksi Penjualan / Jasa'),
-                    const SizedBox(width: 4),
-                    _buildMainTabSegment(1, 'Transaksi Pembelian'),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
+                const SizedBox(height: 8),
 
-            // 3. Date Range Selector Bar Pop-up (Start & End Date)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  // Start Date Input Box
-                  Expanded(
-                    child: _buildDateBox(
-                      label: 'Start',
-                      dateStr: _formatDateIso(_startDate),
-                      onTap: () => _openDatePickerPopup(isStart: true),
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6),
-                    child: Icon(Icons.arrow_forward_rounded, color: textDim, size: 14),
-                  ),
-                  // End Date Input Box
-                  Expanded(
-                    child: _buildDateBox(
-                      label: 'End',
-                      dateStr: _formatDateIso(_endDate),
-                      onTap: () => _openDatePickerPopup(isStart: false),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // 4. Quick Duration Pills: 1 Hari | 7 Hari | 30 Hari
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _activeTab == 0
-                  ? SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildQuickPill('1 Hari'),
-                          const SizedBox(width: 8),
-                          _buildQuickPill('7 Hari'),
-                          const SizedBox(width: 8),
-                          _buildQuickPill('30 Hari'),
-                          const SizedBox(width: 14),
-                          Container(width: 1, height: 16, color: cardBorder),
-                          const SizedBox(width: 14),
-                          _buildPaymentChip('Semua'),
-                          const SizedBox(width: 6),
-                          _buildPaymentChip('QRIS'),
-                          const SizedBox(width: 6),
-                          _buildPaymentChip('TUNAI'),
-                        ],
-                      ),
-                    )
-                  : Row(
-                      children: [
-                        _buildQuickPill('1 Hari', isExpanded: true),
-                        const SizedBox(width: 8),
-                        _buildQuickPill('7 Hari', isExpanded: true),
-                        const SizedBox(width: 8),
-                        _buildQuickPill('30 Hari', isExpanded: true),
-                      ],
-                    ),
-            ),
-            const SizedBox(height: 10),
-
-            // 5. Daftar Transaksi (Tab 0: Penjualan / Tab 1: Pembelian)
-            Expanded(
-              child: _activeTab == 0
-                  ? _buildSalesList(filteredSales)
-                  : _buildPurchasesList(filteredPurchases),
-            ),
-
-            // 6. Sticky Red Button (Tambah Transaksi / Tambah Pembelian)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
-              child: SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    if (_activeTab == 0) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => KasirTransaksiPage(
-                            userData: widget.userData,
+                // 4. Quick Duration Pills: 1 Hari | 7 Hari | 30 Hari | Filter Metode
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _activeTab == 0
+                      ? SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildQuickPill('Semua'),
+                              const SizedBox(width: 6),
+                              _buildQuickPill('1 Hari'),
+                              const SizedBox(width: 6),
+                              _buildQuickPill('7 Hari'),
+                              const SizedBox(width: 6),
+                              _buildQuickPill('30 Hari'),
+                              const SizedBox(width: 12),
+                              Container(width: 1, height: 16, color: cardBorder),
+                              const SizedBox(width: 12),
+                              _buildPaymentChip('Semua'),
+                              const SizedBox(width: 6),
+                              _buildPaymentChip('QRIS'),
+                              const SizedBox(width: 6),
+                              _buildPaymentChip('TUNAI'),
+                            ],
                           ),
+                        )
+                      : Row(
+                          children: [
+                            _buildQuickPill('Semua', isExpanded: true),
+                            const SizedBox(width: 6),
+                            _buildQuickPill('1 Hari', isExpanded: true),
+                            const SizedBox(width: 6),
+                            _buildQuickPill('7 Hari', isExpanded: true),
+                            const SizedBox(width: 6),
+                            _buildQuickPill('30 Hari', isExpanded: true),
+                          ],
                         ),
-                      );
-                    } else {
-                      _openTambahPembelian();
-                    }
-                  },
-                  icon: const Icon(Icons.add, color: textWhite, size: 20),
-                  label: Text(
-                    _activeTab == 0 ? 'Tambah Transaksi Baru' : 'Tambah Pembelian Baru',
-                    style: const TextStyle(
-                      color: textWhite,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.bold,
+                ),
+                const SizedBox(height: 10),
+
+                // 5. Daftar Transaksi (Tab 0: Penjualan / Tab 1: Pembelian)
+                Expanded(
+                  child: _activeTab == 0
+                      ? _buildSalesList(filteredSales)
+                      : _buildPurchasesList(filteredPurchases),
+                ),
+
+                // 6. Sticky Red Button (Tambah Transaksi / Tambah Pembelian)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        if (_activeTab == 0) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => KasirTransaksiPage(
+                                userData: widget.userData,
+                              ),
+                            ),
+                          );
+                        } else {
+                          _openTambahPembelian();
+                        }
+                      },
+                      icon: const Icon(Icons.add, color: textWhite, size: 20),
+                      label: Text(
+                        _activeTab == 0 ? 'Tambah Transaksi Baru' : 'Tambah Pembelian Baru',
+                        style: const TextStyle(
+                          color: textWhite,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentRed,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
                     ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accentRed,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 0,
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: (widget.showBottomNav == true)
-          ? MotoBottomNav(
-              currentIndex: 1,
-              userData: widget.userData,
-            )
-          : null,
+          ),
+          bottomNavigationBar: (widget.showBottomNav == true)
+              ? MotoBottomNav(
+                  currentIndex: 1,
+                  userData: widget.userData,
+                )
+              : null,
+        );
+      },
     );
   }
 
@@ -661,7 +611,7 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
   }
 
   // --- LIST TRANSAKSI PENJUALAN (Screen 12) ---
-  Widget _buildSalesList(List<TransaksiRecord> list) {
+  Widget _buildSalesList(List<TransaksiPenjualanModel> list) {
     if (list.isEmpty) return _buildEmptyState('Tidak ada transaksi penjualan pada periode ini.');
 
     return ListView.separated(
@@ -670,7 +620,7 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final trx = list[index];
-        final isQris = trx.payment == 'QRIS';
+        final isQris = trx.paymentMethod.toUpperCase() == 'QRIS';
 
         return InkWell(
           onTap: () {
@@ -678,24 +628,7 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
               context,
               MaterialPageRoute(
                 builder: (context) => NotaPembayaranPage(
-                  noNota: trx.code,
-                  waktu: trx.timeFormatted,
-                  pelanggan: '${trx.customer} (${trx.vehicle})',
-                  kasir: widget.userData?['nama_lengkap'] ?? 'Sri Ekowati',
-                  items: [
-                    KasirItemModel(
-                      id: '1',
-                      name: trx.service,
-                      category: 'Layanan Servis',
-                      subInfo: 'Transaksi Kasir',
-                      price: trx.amount,
-                      quantity: 1,
-                      isService: true,
-                    ),
-                  ],
-                  totalBayar: trx.amount,
-                  tunaiDiterima: trx.amount,
-                  paymentMethod: isQris ? 'QRIS' : 'Tunai',
+                  transaksi: trx,
                   userData: widget.userData,
                 ),
               ),
@@ -734,7 +667,7 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
                         ),
                       ),
                       child: Text(
-                        trx.payment,
+                        trx.paymentMethod,
                         style: TextStyle(
                           color: isQris ? accentBlue : accentGreen,
                           fontSize: 8.5,
@@ -744,7 +677,7 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
                     ),
                     const Spacer(),
                     Text(
-                      _formatRupiah(trx.amount),
+                      _formatRupiah(trx.totalBayar),
                       style: const TextStyle(
                         color: accentGreen,
                         fontSize: 14,
@@ -755,7 +688,7 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${trx.customer} • ${trx.vehicle}',
+                  '${trx.customerName} • ${trx.vehicleInfo}',
                   style: const TextStyle(
                     color: textWhite,
                     fontSize: 13,
@@ -767,7 +700,7 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
                   children: [
                     Expanded(
                       child: Text(
-                        trx.service,
+                        trx.summaryServices,
                         style: const TextStyle(color: textMuted, fontSize: 11),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -806,13 +739,12 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Row 1: Code & Date, Badge LUNAS, Total Amount (Merah)
               Row(
                 children: [
                   Text(
                     '${item.code} • ${item.dateFormatted}',
                     style: const TextStyle(
-                      color: textMuted,
+                      color: textDim,
                       fontSize: 10.5,
                       fontWeight: FontWeight.w600,
                     ),
@@ -821,16 +753,16 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F2E1E),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFF166534), width: 0.8),
+                      color: const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF334155), width: 1),
                     ),
-                    child: const Text(
-                      'LUNAS',
-                      style: TextStyle(
-                        color: accentGreen,
-                        fontSize: 8,
-                        fontWeight: FontWeight.bold,
+                    child: Text(
+                      item.status,
+                      style: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -839,41 +771,37 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
                     _formatRupiah(item.totalAmount),
                     style: const TextStyle(
                       color: Color(0xFFF87171),
-                      fontSize: 13.5,
+                      fontSize: 14,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
-
-              // Row 2: Buyer & Supplier
               Text(
-                '${item.buyerName} • ${item.supplier}',
+                'Supplier: ${item.supplier}',
                 style: const TextStyle(
                   color: textWhite,
-                  fontSize: 12.5,
+                  fontSize: 13,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 5),
-
-              // Row 3: Items summary & Chevron
               Row(
                 children: [
                   Expanded(
                     child: Text(
                       item.summaryItems,
-                      style: const TextStyle(
-                        color: textMuted,
-                        fontSize: 10.5,
-                      ),
+                      style: const TextStyle(color: textMuted, fontSize: 11),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text('›', style: TextStyle(color: textMuted, fontSize: 16)),
+                  Text(
+                    'PIC: ${item.buyerName}',
+                    style: const TextStyle(color: textDim, fontSize: 10),
+                  ),
                 ],
               ),
             ],
@@ -883,24 +811,16 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
     );
   }
 
-  Widget _buildEmptyState(String msg) {
+  Widget _buildEmptyState(String message) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: cardBg,
-              shape: BoxShape.circle,
-              border: Border.all(color: cardBorder),
-            ),
-            child: const Icon(Icons.receipt_long_outlined, color: textDim, size: 36),
-          ),
+          Icon(Icons.inbox_outlined, color: textDim.withValues(alpha: 0.5), size: 48),
           const SizedBox(height: 12),
           Text(
-            msg,
-            style: const TextStyle(color: textMuted, fontSize: 12),
+            message,
+            style: const TextStyle(color: textDim, fontSize: 12),
             textAlign: TextAlign.center,
           ),
         ],

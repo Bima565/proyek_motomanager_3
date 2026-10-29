@@ -1,28 +1,32 @@
 import 'package:flutter/material.dart';
-import 'kasir_transaksi.dart';
+import 'package:flutter/services.dart';
+import '../../components/rupiah_formatter.dart';
+import '../../services/transaksi_service.dart';
 
 /// Screen 4 - (FR07) Nota Pembayaran & Bagikan WA
 class NotaPembayaranPage extends StatelessWidget {
-  final String noNota;
-  final String waktu;
-  final String pelanggan;
-  final String kasir;
-  final List<KasirItemModel> items;
-  final int totalBayar;
-  final int tunaiDiterima;
-  final String paymentMethod;
+  final TransaksiPenjualanModel? transaksi;
+  final String? noNota;
+  final String? waktu;
+  final String? pelanggan;
+  final String? kasir;
+  final List<TransaksiItemModel>? items;
+  final int? totalBayar;
+  final int? tunaiDiterima;
+  final String? paymentMethod;
   final Map<String, dynamic>? userData;
 
   const NotaPembayaranPage({
     super.key,
-    required this.noNota,
-    required this.waktu,
-    required this.pelanggan,
-    required this.kasir,
-    required this.items,
-    required this.totalBayar,
-    required this.tunaiDiterima,
-    this.paymentMethod = 'Tunai',
+    this.transaksi,
+    this.noNota,
+    this.waktu,
+    this.pelanggan,
+    this.kasir,
+    this.items,
+    this.totalBayar,
+    this.tunaiDiterima,
+    this.paymentMethod,
     this.userData,
   });
 
@@ -37,73 +41,347 @@ class NotaPembayaranPage extends StatelessWidget {
   static const Color textMuted = Color(0xFF9CA3AF);
   static const Color textDim = Color(0xFF6B7280);
 
-  String _formatRupiah(int nominal) {
-    final str = nominal.toString();
-    final buffer = StringBuffer();
-    int count = 0;
-    for (int i = str.length - 1; i >= 0; i--) {
-      buffer.write(str[i]);
-      count++;
-      if (count % 3 == 0 && i != 0) {
-        buffer.write('.');
-      }
+  // Getters dengan fallback
+  String get effectiveNoNota =>
+      transaksi?.code ?? noNota ?? 'TRX-20260929-026';
+  String get effectiveWaktu =>
+      transaksi?.notaTimeFormatted ?? waktu ?? '29/09/2026 • 10:45 WIB';
+  String get effectivePelanggan {
+    if (transaksi != null) {
+      final plat = transaksi!.policeNumber.isNotEmpty
+          ? ' (${transaksi!.policeNumber})'
+          : '';
+      return '${transaksi!.customerName}$plat';
     }
-    return 'Rp ${buffer.toString().split('').reversed.join('')}';
+    return pelanggan ?? 'Bpk. Rahmat Santoso (B 4921 KDF)';
+  }
+
+  String get effectiveKasir =>
+      transaksi?.kasirName ??
+      kasir ??
+      userData?['nama_lengkap'] ??
+      'Sri Ekowati';
+
+  List<TransaksiItemModel> get effectiveItems =>
+      transaksi?.items ?? items ?? [];
+
+  int get effectiveTotalBayar =>
+      transaksi?.totalBayar ?? totalBayar ?? 0;
+
+  String get effectivePaymentMethod =>
+      transaksi?.paymentMethod ?? paymentMethod ?? 'Tunai';
+
+  int get effectiveTunaiDiterima =>
+      transaksi?.tunaiDiterima ??
+      tunaiDiterima ??
+      (effectivePaymentMethod == 'Tunai' ? effectiveTotalBayar : effectiveTotalBayar);
+
+  int get effectiveKembalian {
+    if (transaksi != null) return transaksi!.kembalian;
+    if (effectivePaymentMethod == 'Tunai' &&
+        effectiveTunaiDiterima > effectiveTotalBayar) {
+      return effectiveTunaiDiterima - effectiveTotalBayar;
+    }
+    return 0;
+  }
+
+  String _formatRupiah(int nominal) => formatRupiah(nominal);
+
+  String _generateWhatsAppInvoiceText() {
+    final buffer = StringBuffer();
+    buffer.writeln('*BENGKEL ZALZABILA MOTOR*');
+    buffer.writeln('Jl. Raya Industri No. 45 • Telp/WA: 0812-3456-7890');
+    buffer.writeln('----------------------------------------');
+    buffer.writeln('*NOTA TRANSAKSI PEMBAYARAN*');
+    buffer.writeln('No. Nota  : $effectiveNoNota');
+    buffer.writeln('Waktu     : $effectiveWaktu');
+    buffer.writeln('Pelanggan : $effectivePelanggan');
+    buffer.writeln('Kasir     : $effectiveKasir');
+    buffer.writeln('----------------------------------------');
+    buffer.writeln('*RINCIAN BARANG & JASA:*');
+
+    for (int i = 0; i < effectiveItems.length; i++) {
+      final item = effectiveItems[i];
+      buffer.writeln('${i + 1}. ${item.name}');
+      buffer.writeln('   ${item.quantity}x ${_formatRupiah(item.price)} = ${_formatRupiah(item.total)}');
+    }
+
+    buffer.writeln('----------------------------------------');
+    buffer.writeln('*TOTAL PEMBAYARAN: ${_formatRupiah(effectiveTotalBayar)}*');
+    buffer.writeln('Metode   : $effectivePaymentMethod');
+    if (effectivePaymentMethod == 'Tunai') {
+      buffer.writeln('Tunai    : ${_formatRupiah(effectiveTunaiDiterima)}');
+      buffer.writeln('Kembalian: ${_formatRupiah(effectiveKembalian)}');
+    }
+    buffer.writeln('Status   : LUNAS');
+    buffer.writeln('----------------------------------------');
+    buffer.writeln('Terima kasih telah mempercayakan perawatan motor Anda kepada Bengkel Zalzabila Motor!');
+    buffer.writeln('Simpan nota ini sebagai bukti garansi servis.');
+
+    return buffer.toString();
   }
 
   void _shareViaWhatsApp(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: const Color(0xFF0F2B1D),
-        behavior: SnackBarBehavior.floating,
+    final text = _generateWhatsAppInvoiceText();
+    Clipboard.setData(ClipboardData(text: text));
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBg,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0xFF166534), width: 1),
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: cardBorder),
         ),
-        content: Row(
+        title: Row(
           children: const [
-            Icon(Icons.check_circle_rounded, color: accentGreen, size: 20),
+            Icon(Icons.chat_rounded, color: waGreen, size: 22),
             SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Nota transaksi berhasil dibagikan ke WhatsApp pelanggan!',
-                style: TextStyle(color: textWhite, fontSize: 12),
+            Text(
+              'Bagikan Nota WhatsApp',
+              style: TextStyle(
+                color: textWhite,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
         ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Teks nota pembayaran telah disalin ke Clipboard! Anda dapat langsung paste dan kirimkan ke chat WhatsApp pelanggan.',
+              style: TextStyle(color: textMuted, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 180),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: bgDark,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: cardBorder),
+              ),
+              child: SingleChildScrollView(
+                child: Text(
+                  text,
+                  style: const TextStyle(
+                    color: textWhite,
+                    fontSize: 10.5,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Tutup', style: TextStyle(color: textDim)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: waGreen,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  backgroundColor: const Color(0xFF0F2B1D),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: Color(0xFF166534), width: 1),
+                  ),
+                  content: Row(
+                    children: const [
+                      Icon(Icons.check_circle_rounded, color: accentGreen, size: 20),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Teks nota disalin! Buka WhatsApp untuk mengirim ke pelanggan.',
+                          style: TextStyle(color: textWhite, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.copy_rounded, color: textWhite, size: 16),
+            label: const Text('Salin Ulang Teks', style: TextStyle(color: textWhite)),
+          ),
+        ],
       ),
     );
   }
 
   void _printReceiptPdf(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: const Color(0xFF142033),
-        behavior: SnackBarBehavior.floating,
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBg,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0xFF1E3A8A), width: 1),
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: cardBorder),
         ),
-        content: Row(
+        title: Row(
           children: const [
-            Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF38BDF8), size: 20),
+            Icon(Icons.receipt_rounded, color: accentRed, size: 22),
             SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Struk transaksi (PDF) sedang dicetak / disimpan...',
-                style: TextStyle(color: textWhite, fontSize: 12),
+            Text(
+              'Cetak Struk Thermal (PDF)',
+              style: TextStyle(
+                color: textWhite,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
         ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFFFF),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DefaultTextStyle(
+                style: const TextStyle(
+                  color: Color(0xFF1E293B),
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'BENGKEL ZALZABILA MOTOR',
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text('Jl. Raya Industri No. 45'),
+                    const Text('Telp/WA: 0812-3456-7890'),
+                    const Text('================================='),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('No: $effectiveNoNota'),
+                        Text(effectivePaymentMethod),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Kasir: $effectiveKasir'),
+                        Text(effectiveWaktu.split('•').first.trim()),
+                      ],
+                    ),
+                    const Text('---------------------------------'),
+                    ...effectiveItems.map((i) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${i.name} (${i.quantity}x)',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Text(_formatRupiah(i.total)),
+                            ],
+                          ),
+                        )),
+                    const Text('---------------------------------'),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('TOTAL:', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(_formatRupiah(effectiveTotalBayar),
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    if (effectivePaymentMethod == 'Tunai') ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('BAYAR TUNAI:'),
+                          Text(_formatRupiah(effectiveTunaiDiterima)),
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('KEMBALIAN:'),
+                          Text(_formatRupiah(effectiveKembalian)),
+                        ],
+                      ),
+                    ],
+                    const Text('================================='),
+                    const Text('TERIMA KASIH'),
+                    const Text('GARANSI SERVIS 7 HARI'),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal', style: TextStyle(color: textDim)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentRed,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  backgroundColor: const Color(0xFF142033),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: Color(0xFF1E3A8A), width: 1),
+                  ),
+                  content: Row(
+                    children: const [
+                      Icon(Icons.print_rounded, color: Color(0xFF38BDF8), size: 20),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Struk nota siap dicetak ke printer POS!',
+                          style: TextStyle(color: textWhite, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.print_rounded, color: textWhite, size: 16),
+            label: const Text('Cetak Sekarang', style: TextStyle(color: textWhite)),
+          ),
+        ],
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final int kembalian = tunaiDiterima > totalBayar ? tunaiDiterima - totalBayar : 0;
+    final int kembalian = effectiveKembalian;
 
     return Scaffold(
       backgroundColor: bgDark,
@@ -205,13 +483,13 @@ class NotaPembayaranPage extends StatelessWidget {
                     const SizedBox(height: 12),
 
                     // Metadata Transaksi
-                    _buildMetaRow('No. Nota', noNota, isBoldValue: true),
+                    _buildMetaRow('No. Nota', effectiveNoNota, isBoldValue: true),
                     const SizedBox(height: 6),
-                    _buildMetaRow('Waktu', waktu),
+                    _buildMetaRow('Waktu', effectiveWaktu),
                     const SizedBox(height: 6),
-                    _buildMetaRow('Pelanggan', pelanggan),
+                    _buildMetaRow('Pelanggan', effectivePelanggan),
                     const SizedBox(height: 6),
-                    _buildMetaRow('Kasir', kasir),
+                    _buildMetaRow('Kasir', effectiveKasir),
                     const SizedBox(height: 12),
 
                     // Divider 2
@@ -245,7 +523,7 @@ class NotaPembayaranPage extends StatelessWidget {
                     const SizedBox(height: 10),
 
                     // List Items
-                    ...items.asMap().entries.map((entry) {
+                    ...effectiveItems.asMap().entries.map((entry) {
                       final idx = entry.key + 1;
                       final item = entry.value;
                       return Padding(
@@ -310,7 +588,7 @@ class NotaPembayaranPage extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          _formatRupiah(totalBayar),
+                          _formatRupiah(effectiveTotalBayar),
                           style: const TextStyle(
                             color: accentGreen,
                             fontSize: 15,
@@ -326,7 +604,9 @@ class NotaPembayaranPage extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          paymentMethod == 'Tunai' ? 'Tunai Diterima' : 'Metode Pembayaran',
+                          effectivePaymentMethod == 'Tunai'
+                              ? 'Tunai Diterima'
+                              : 'Metode Pembayaran',
                           style: const TextStyle(
                             color: textMuted,
                             fontSize: 10,
@@ -334,9 +614,9 @@ class NotaPembayaranPage extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          paymentMethod == 'Tunai'
-                              ? _formatRupiah(tunaiDiterima)
-                              : 'QRIS / Non-Tunai',
+                          effectivePaymentMethod == 'Tunai'
+                              ? _formatRupiah(effectiveTunaiDiterima)
+                              : '$effectivePaymentMethod / Non-Tunai',
                           style: const TextStyle(
                             color: textWhite,
                             fontSize: 10,
@@ -345,7 +625,7 @@ class NotaPembayaranPage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    if (paymentMethod == 'Tunai' && kembalian > 0) ...[
+                    if (effectivePaymentMethod == 'Tunai' && kembalian >= 0) ...[
                       const SizedBox(height: 6),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -431,8 +711,6 @@ class NotaPembayaranPage extends StatelessWidget {
                 height: 48,
                 child: OutlinedButton(
                   onPressed: () {
-                    // Kembali ke layar sebelumnya (atau 2 layar sebelumnya)
-                    Navigator.pop(context);
                     Navigator.pop(context);
                   },
                   style: OutlinedButton.styleFrom(
@@ -466,7 +744,7 @@ class NotaPembayaranPage extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            color: textDim,
+            color: textMuted,
             fontSize: 10,
             fontWeight: FontWeight.w500,
           ),
@@ -474,8 +752,8 @@ class NotaPembayaranPage extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            color: isBoldValue ? textWhite : const Color(0xFFE5E7EB),
-            fontSize: 10,
+            color: textWhite,
+            fontSize: 10.5,
             fontWeight: isBoldValue ? FontWeight.bold : FontWeight.w600,
           ),
         ),

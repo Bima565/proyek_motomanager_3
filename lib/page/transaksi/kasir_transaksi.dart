@@ -1,29 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../components/back_button_circle.dart';
 import '../../components/rupiah_formatter.dart';
+import '../../services/transaksi_service.dart';
 import 'nota_pembayaran.dart';
 
-class KasirItemModel {
-  String id;
-  String name;
-  String category;
-  String subInfo;
-  int price;
-  int quantity;
-  bool isService;
-
-  KasirItemModel({
-    required this.id,
-    required this.name,
-    required this.category,
-    required this.subInfo,
-    required this.price,
-    this.quantity = 1,
-    required this.isService,
-  });
-
-  int get total => price * quantity;
-}
+// Alias backward compatibility
+typedef KasirItemModel = TransaksiItemModel;
 
 /// Screen 3 - (FR07) Kasir & Transaksi
 class KasirTransaksiPage extends StatefulWidget {
@@ -52,19 +34,25 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
   String _customerName = 'Bpk. Rahmat Santoso';
   String _vehicleInfo = 'Honda Vario 160';
   String _policeNumber = 'B 4921 KDF';
-  final String _trxCode = 'TRX-20260929-026';
+  String _customerPhone = '081234567890';
+  late String _trxCode;
 
   // Metode Pembayaran ('Tunai' atau 'QRIS')
   String _paymentMethod = 'Tunai';
 
+  // Controller Uang Tunai Diterima
+  final TextEditingController _cashReceivedController =
+      TextEditingController(text: '200000');
+
   // Daftar Item Transaksi
-  late List<KasirItemModel> _items;
+  late List<TransaksiItemModel> _items;
 
   @override
   void initState() {
     super.initState();
+    _trxCode = TransaksiService().generateTrxCode();
     _items = [
-      KasirItemModel(
+      TransaksiItemModel(
         id: '1',
         name: 'Jasa Servis Lengkap + Tune Up',
         category: 'Jasa Servis',
@@ -73,7 +61,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
         quantity: 1,
         isService: true,
       ),
-      KasirItemModel(
+      TransaksiItemModel(
         id: '2',
         name: 'Oli Shell Advance AX7 0.8L',
         category: 'Oli & Pelumas',
@@ -82,7 +70,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
         quantity: 1,
         isService: false,
       ),
-      KasirItemModel(
+      TransaksiItemModel(
         id: '3',
         name: 'Busi NGK CPR9EA-9',
         category: 'Kelistrikan',
@@ -94,7 +82,26 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     ];
   }
 
-  int get _totalBayar => _items.fold(0, (sum, item) => sum + item.total);
+  @override
+  void dispose() {
+    _cashReceivedController.dispose();
+    super.dispose();
+  }
+
+  int get _totalBayar =>
+      _items.fold(0, (total, item) => total + item.total);
+
+  int get _tunaiDiterima {
+    if (_paymentMethod != 'Tunai') return _totalBayar;
+    final parsed = int.tryParse(
+        _cashReceivedController.text.replaceAll(RegExp(r'[^0-9]'), ''));
+    return parsed ?? 0;
+  }
+
+  int get _kembalian =>
+      _paymentMethod == 'Tunai' && _tunaiDiterima >= _totalBayar
+          ? _tunaiDiterima - _totalBayar
+          : 0;
 
   String _formatRupiah(int nominal) => formatRupiah(nominal);
 
@@ -102,6 +109,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     final nameCtrl = TextEditingController(text: _customerName);
     final vehicleCtrl = TextEditingController(text: _vehicleInfo);
     final platCtrl = TextEditingController(text: _policeNumber);
+    final phoneCtrl = TextEditingController(text: _customerPhone);
 
     showDialog(
       context: context,
@@ -112,37 +120,48 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
           side: const BorderSide(color: cardBorder),
         ),
         title: const Text(
-          'Edit Data Pelanggan',
+          'Edit Data Pelanggan & Motor',
           style: TextStyle(color: textWhite, fontSize: 16, fontWeight: FontWeight.bold),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Nama Pelanggan', style: TextStyle(color: textMuted, fontSize: 11)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: nameCtrl,
-              style: const TextStyle(color: textWhite, fontSize: 13),
-              decoration: _buildInputDecoration('Nama pelanggan'),
-            ),
-            const SizedBox(height: 12),
-            const Text('Motor / Kendaraan', style: TextStyle(color: textMuted, fontSize: 11)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: vehicleCtrl,
-              style: const TextStyle(color: textWhite, fontSize: 13),
-              decoration: _buildInputDecoration('Contoh: Honda Vario 160'),
-            ),
-            const SizedBox(height: 12),
-            const Text('Nomor Plat', style: TextStyle(color: textMuted, fontSize: 11)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: platCtrl,
-              style: const TextStyle(color: textWhite, fontSize: 13),
-              decoration: _buildInputDecoration('Contoh: B 4921 KDF'),
-            ),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Nama Pelanggan', style: TextStyle(color: textMuted, fontSize: 11)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: nameCtrl,
+                style: const TextStyle(color: textWhite, fontSize: 13),
+                decoration: _buildInputDecoration('Nama pelanggan'),
+              ),
+              const SizedBox(height: 12),
+              const Text('Motor / Kendaraan', style: TextStyle(color: textMuted, fontSize: 11)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: vehicleCtrl,
+                style: const TextStyle(color: textWhite, fontSize: 13),
+                decoration: _buildInputDecoration('Contoh: Honda Vario 160'),
+              ),
+              const SizedBox(height: 12),
+              const Text('Nomor Plat', style: TextStyle(color: textMuted, fontSize: 11)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: platCtrl,
+                style: const TextStyle(color: textWhite, fontSize: 13),
+                decoration: _buildInputDecoration('Contoh: B 4921 KDF'),
+              ),
+              const SizedBox(height: 12),
+              const Text('No. WhatsApp / HP', style: TextStyle(color: textMuted, fontSize: 11)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: phoneCtrl,
+                keyboardType: TextInputType.phone,
+                style: const TextStyle(color: textWhite, fontSize: 13),
+                decoration: _buildInputDecoration('Contoh: 081234567890'),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -159,6 +178,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                 _customerName = nameCtrl.text.trim();
                 _vehicleInfo = vehicleCtrl.text.trim();
                 _policeNumber = platCtrl.text.trim();
+                _customerPhone = phoneCtrl.text.trim();
               });
               Navigator.pop(ctx);
             },
@@ -170,13 +190,12 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
   }
 
   void _showPickFromHistorySheet() {
-    String selectedDay = 'Semua';
+    String selectedCategory = 'Semua';
     final historyItems = [
       {
         'name': 'Jasa Servis Lengkap + Tune Up',
         'category': 'Jasa Servis',
         'price': 80000,
-        'day': 'Sabtu',
         'isService': true,
         'subInfo': 'Ongkos Mekanik',
       },
@@ -184,39 +203,48 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
         'name': 'Servis Ringan + Ganti Oli MPX2',
         'category': 'Jasa Servis',
         'price': 65000,
-        'day': 'Sabtu',
         'isService': true,
         'subInfo': 'Servis Rutin',
       },
       {
-        'name': 'Ganti Oli Gardan + Busi NGK',
+        'name': 'Oli Shell Advance AX7 0.8L',
         'category': 'Sparepart',
-        'price': 45000,
-        'day': 'Jumat',
+        'price': 65000,
         'isService': false,
-        'subInfo': 'Pelumas & Pengapian',
+        'subInfo': 'Sisa: 12',
       },
       {
-        'name': 'Bersihkan Injektor & Throttle Body',
-        'category': 'Jasa Servis',
-        'price': 50000,
-        'day': 'Jumat',
-        'isService': true,
-        'subInfo': 'Injeksi System',
+        'name': 'Busi NGK CPR9EA-9',
+        'category': 'Sparepart',
+        'price': 30000,
+        'isService': false,
+        'subInfo': 'Sisa: 18',
       },
       {
         'name': 'Ganti Kampas Rem Belakang',
         'category': 'Sparepart',
         'price': 40000,
-        'day': 'Kamis',
         'isService': false,
         'subInfo': 'Pengereman',
+      },
+      {
+        'name': 'Kampas Rem Depan Vario/Beat',
+        'category': 'Sparepart',
+        'price': 55000,
+        'isService': false,
+        'subInfo': 'Pengereman • Sisa: 5',
+      },
+      {
+        'name': 'Bersihkan Injektor & Throttle Body',
+        'category': 'Jasa Servis',
+        'price': 50000,
+        'isService': true,
+        'subInfo': 'Injeksi System',
       },
       {
         'name': 'Tambal Tubeless + Cairan Ban',
         'category': 'Jasa Servis',
         'price': 35000,
-        'day': 'Rabu',
         'isService': true,
         'subInfo': 'Ban & Velg',
       },
@@ -224,7 +252,6 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
         'name': 'Servis CVT + Ganti Roller',
         'category': 'Jasa Servis',
         'price': 90000,
-        'day': 'Selasa',
         'isService': true,
         'subInfo': 'Transmisi Otomatis',
       },
@@ -232,13 +259,26 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
         'name': 'Stel Klep & Rantai Roda',
         'category': 'Jasa Servis',
         'price': 30000,
-        'day': 'Senin',
         'isService': true,
         'subInfo': 'Mesin',
       },
+      {
+        'name': 'Oli Yamalube Silver 0.8L',
+        'category': 'Sparepart',
+        'price': 45000,
+        'isService': false,
+        'subInfo': 'Sisa: 8',
+      },
+      {
+        'name': 'Ban Luar Tubeless FDR 90/90-14',
+        'category': 'Sparepart',
+        'price': 185000,
+        'isService': false,
+        'subInfo': 'Sisa: 14',
+      },
     ];
 
-    final days = ['Semua', 'Sabtu', 'Jumat', 'Kamis', 'Rabu', 'Selasa', 'Senin'];
+    final categories = ['Semua', 'Jasa Servis', 'Sparepart'];
 
     showModalBottomSheet(
       context: context,
@@ -248,9 +288,11 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
       ),
       builder: (ctx) => StatefulBuilder(
         builder: (context, setSheetState) {
-          final filtered = selectedDay == 'Semua'
+          final filtered = selectedCategory == 'Semua'
               ? historyItems
-              : historyItems.where((h) => h['day'] == selectedDay).toList();
+              : historyItems
+                  .where((h) => h['category'] == selectedCategory)
+                  .toList();
 
           return Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -273,7 +315,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Pilih Layanan dari Riwayat',
+                      'Pilih Layanan / Item dari Katalog',
                       style: TextStyle(
                         color: textWhite,
                         fontSize: 15,
@@ -291,20 +333,20 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Bubble filter hari
+                // Bubble filter kategori
                 SizedBox(
                   height: 32,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: days.length,
+                    itemCount: categories.length,
                     separatorBuilder: (_, _) => const SizedBox(width: 8),
                     itemBuilder: (context, index) {
-                      final day = days[index];
-                      final isSelected = selectedDay == day;
+                      final cat = categories[index];
+                      final isSelected = selectedCategory == cat;
                       return GestureDetector(
-                        onTap: () => setSheetState(() => selectedDay = day),
+                        onTap: () => setSheetState(() => selectedCategory = cat),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                           decoration: BoxDecoration(
                             color: isSelected ? accentRed : const Color(0xFF10131B),
                             borderRadius: BorderRadius.circular(16),
@@ -313,7 +355,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                             ),
                           ),
                           child: Text(
-                            day,
+                            cat,
                             style: TextStyle(
                               color: isSelected ? textWhite : textMuted,
                               fontSize: 11,
@@ -339,21 +381,28 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                       final subInfo = item['subInfo'] as String;
                       final price = item['price'] as int;
                       final isService = item['isService'] as bool;
-                      final day = item['day'] as String;
 
                       return InkWell(
                         onTap: () {
                           setState(() {
-                            _items.add(
-                              KasirItemModel(
-                                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                                name: name,
-                                category: category,
-                                subInfo: subInfo,
-                                price: price,
-                                isService: isService,
-                              ),
-                            );
+                            // Cek jika item sudah ada di keranjang, tambah quantity
+                            final existingIndex = _items.indexWhere(
+                                (i) => i.name.toLowerCase() == name.toLowerCase());
+                            if (existingIndex >= 0) {
+                              _items[existingIndex].quantity += 1;
+                            } else {
+                              _items.add(
+                                TransaksiItemModel(
+                                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                                  name: name,
+                                  category: category,
+                                  subInfo: subInfo,
+                                  price: price,
+                                  quantity: 1,
+                                  isService: isService,
+                                ),
+                              );
+                            }
                           });
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -392,7 +441,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                                       ),
                                     ),
                                     Text(
-                                      '$category • Hari $day',
+                                      '$category • $subInfo',
                                       style: const TextStyle(color: textDim, fontSize: 10),
                                     ),
                                   ],
@@ -484,7 +533,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                 controller: nameCtrl,
                 style: const TextStyle(color: textWhite, fontSize: 13),
                 decoration: _buildInputDecoration(
-                    isJasa ? 'Contoh: Bersihkan Injektor' : 'Contoh: Kampas Rem'),
+                    isJasa ? 'Contoh: Bersihkan Injektor' : 'Contoh: Kampas Rem Depan'),
               ),
               const SizedBox(height: 12),
               const Text('Harga / Tarif (Rp)', style: TextStyle(color: textMuted, fontSize: 11)),
@@ -513,12 +562,13 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                 if (name.isNotEmpty && price > 0) {
                   setState(() {
                     _items.add(
-                      KasirItemModel(
+                      TransaksiItemModel(
                         id: DateTime.now().millisecondsSinceEpoch.toString(),
                         name: name,
                         category: isJasa ? 'Jasa Servis' : 'Sparepart',
-                        subInfo: isJasa ? 'Ongkos Mekanik' : 'Stok Tersedia',
+                        subInfo: isJasa ? 'Ongkos Mekanik' : 'Stok Baru',
                         price: price,
+                        quantity: 1,
                         isService: isJasa,
                       ),
                     );
@@ -534,7 +584,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     );
   }
 
-  void _showEditItemDialog(KasirItemModel item) {
+  void _showEditItemDialog(TransaksiItemModel item) {
     final priceCtrl = TextEditingController(text: item.price.toString());
     int qty = item.quantity;
 
@@ -609,7 +659,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     );
   }
 
-  void _handleProcessPayment() {
+  void _handleProcessPayment() async {
     if (_items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -620,20 +670,48 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
       return;
     }
 
+    if (_paymentMethod == 'Tunai' && _tunaiDiterima < _totalBayar) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF3B1517),
+          content: Text(
+            'Uang tunai diterima (${_formatRupiah(_tunaiDiterima)}) kurang dari total pembayaran (${_formatRupiah(_totalBayar)})!',
+          ),
+        ),
+      );
+      return;
+    }
+
     final kasirName = widget.userData?['nama_lengkap'] ?? 'Sri Ekowati';
+
+    // Buat model transaksi lengkap
+    final newTransaction = TransaksiPenjualanModel(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      code: _trxCode,
+      dateTime: DateTime.now(),
+      customerName: _customerName,
+      vehicleInfo: _vehicleInfo,
+      policeNumber: _policeNumber,
+      customerPhone: _customerPhone,
+      kasirName: kasirName,
+      items: List.from(_items),
+      totalBayar: _totalBayar,
+      paymentMethod: _paymentMethod,
+      tunaiDiterima: _tunaiDiterima,
+      kembalian: _kembalian,
+      status: 'Lunas',
+    );
+
+    // Simpan ke TransaksiService (Cloud Firestore + Local state)
+    final savedTrx = await TransaksiService().saveTransaksi(newTransaction);
+
+    if (!mounted) return;
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => NotaPembayaranPage(
-          noNota: _trxCode,
-          waktu: '29/09/2026 • 10:45 WIB',
-          pelanggan: '$_customerName ($_policeNumber)',
-          kasir: kasirName,
-          items: _items,
-          totalBayar: _totalBayar,
-          tunaiDiterima: _paymentMethod == 'Tunai' ? 200000 : _totalBayar,
-          paymentMethod: _paymentMethod,
+          transaksi: savedTrx,
           userData: widget.userData,
         ),
       ),
@@ -828,38 +906,45 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'DATA PELANGGAN & MOTOR',
-                style: TextStyle(
-                  color: textDim,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'DATA PELANGGAN & MOTOR',
+                  style: TextStyle(
+                    color: textDim,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _customerName,
-                style: const TextStyle(
-                  color: textWhite,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
+                const SizedBox(height: 4),
+                Text(
+                  _customerName,
+                  style: const TextStyle(
+                    color: textWhite,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '$_vehicleInfo ($_policeNumber)',
-                style: const TextStyle(
-                  color: textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
+                const SizedBox(height: 2),
+                Text(
+                  '$_vehicleInfo ($_policeNumber) • $_customerPhone',
+                  style: const TextStyle(
+                    color: textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          const SizedBox(width: 10),
           GestureDetector(
             onTap: _showEditCustomerDialog,
             child: Container(
@@ -925,7 +1010,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: const [
                       Text(
-                        'Pilih dari history',
+                        'Pilih dari history / katalog',
                         style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.w500),
                       ),
                       Icon(Icons.keyboard_arrow_down_rounded, color: textDim, size: 18),
@@ -959,7 +1044,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     );
   }
 
-  Widget _buildItemCard(KasirItemModel item) {
+  Widget _buildItemCard(TransaksiItemModel item) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1010,7 +1095,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Kategori: ${item.category} • ${item.subInfo}',
+                  '${item.category} • ${item.subInfo} • ${item.quantity}x',
                   style: const TextStyle(
                     color: textMuted,
                     fontSize: 9.5,
@@ -1088,6 +1173,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
         border: Border.all(color: cardBorder, width: 1),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1183,7 +1269,106 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
               ),
             ],
           ),
+
+          if (_paymentMethod == 'Tunai') ...[
+            const SizedBox(height: 14),
+            const Text(
+              'Uang Tunai Diterima',
+              style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _cashReceivedController,
+              keyboardType: TextInputType.number,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(color: textWhite, fontSize: 13, fontWeight: FontWeight.bold),
+              decoration: _buildInputDecoration('Nominal tunai', prefix: 'Rp '),
+            ),
+            const SizedBox(height: 8),
+            // Quick Amount Buttons
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _buildQuickCashPill('Uang Pas', _totalBayar),
+                _buildQuickCashPill('50rb', 50000),
+                _buildQuickCashPill('100rb', 100000),
+                _buildQuickCashPill('200rb', 200000),
+                _buildQuickCashPill('500rb', 500000),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: bgDark,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: cardBorder),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Kembalian', style: TextStyle(color: textMuted, fontSize: 11)),
+                  Text(
+                    _tunaiDiterima >= _totalBayar
+                        ? _formatRupiah(_kembalian)
+                        : 'Kurang ${_formatRupiah(_totalBayar - _tunaiDiterima)}',
+                    style: TextStyle(
+                      color: _tunaiDiterima >= _totalBayar ? accentGreen : accentRed,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F1A2E),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF1E3A8A)),
+              ),
+              child: Row(
+                children: const [
+                  Icon(Icons.qr_code_scanner_rounded, color: accentBlue, size: 24),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Tunjukkan QRIS Bengkel kepada pelanggan untuk pembayaran digital langsung.',
+                      style: TextStyle(color: textWhite, fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildQuickCashPill(String label, int amount) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _cashReceivedController.text = amount.toString();
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFF101420),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: cardBorder),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(color: textMuted, fontSize: 10, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
