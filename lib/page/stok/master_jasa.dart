@@ -1,19 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../services/jasa_service.dart';
 import 'data_sparepart.dart';
 
-class JasaModel {
-  String id;
-  String name;
-  int price;
-  String lastEdited;
-
-  JasaModel({
-    required this.id,
-    required this.name,
-    required this.price,
-    required this.lastEdited,
-  });
-}
+export '../../services/jasa_service.dart' show JasaModel;
 
 /// Screen 6 - Master Layanan Jasa Servis (FR06)
 class MasterJasaPage extends StatefulWidget {
@@ -42,62 +31,9 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  // Dummy List Jasa Servis sesuai Penpot FR06
-  late List<JasaModel> _services;
-
   @override
   void initState() {
     super.initState();
-    _services = [
-      JasaModel(
-        id: '1',
-        name: 'Servis Lengkap + Tune Up',
-        price: 80000,
-        lastEdited: 'Diedit 13:45 28/9/2026',
-      ),
-      JasaModel(
-        id: '2',
-        name: 'Servis CVT & Pembersihan',
-        price: 60000,
-        lastEdited: '08:30 20/9/2026',
-      ),
-      JasaModel(
-        id: '3',
-        name: 'Ganti Oli Mesin / Gardan',
-        price: 15000,
-        lastEdited: 'Diedit 15:20 28/9/2026',
-      ),
-      JasaModel(
-        id: '4',
-        name: 'Servis Injeksi & Reset ECU',
-        price: 75000,
-        lastEdited: '10:15 15/9/2026',
-      ),
-      JasaModel(
-        id: '5',
-        name: 'Ganti Ban Luar / Tubeless',
-        price: 25000,
-        lastEdited: 'Diedit 11:00 25/9/2026',
-      ),
-      JasaModel(
-        id: '6',
-        name: 'Servis Throttle Body / Injeksi',
-        price: 45000,
-        lastEdited: '14:10 24/9/2026',
-      ),
-      JasaModel(
-        id: '7',
-        name: 'Ganti Kampas Rem Depan / Belakang',
-        price: 20000,
-        lastEdited: '09:00 22/9/2026',
-      ),
-      JasaModel(
-        id: '8',
-        name: 'Overhaul Mesin / Turun Mesin',
-        price: 250000,
-        lastEdited: '16:30 18/9/2026',
-      ),
-    ];
   }
 
   @override
@@ -120,9 +56,9 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
     return buffer.toString().split('').reversed.join('');
   }
 
-  List<JasaModel> get _filteredServices {
-    if (_searchQuery.isEmpty) return _services;
-    return _services
+  List<JasaModel> _getFilteredServices(List<JasaModel> services) {
+    if (_searchQuery.isEmpty) return services;
+    return services
         .where((s) => s.name.toLowerCase().contains(_searchQuery.toLowerCase()))
         .toList();
   }
@@ -327,31 +263,32 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
                     ),
                     elevation: 0,
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     final name = nameController.text.trim();
                     final priceRaw = priceController.text.replaceAll('.', '').trim();
                     final price = int.tryParse(priceRaw) ?? 0;
 
                     if (name.isNotEmpty && price > 0) {
-                      setState(() {
-                        if (isEdit) {
-                          itemToEdit.name = name;
-                          itemToEdit.price = price;
-                          itemToEdit.lastEdited = 'Diedit baru saja';
-                        } else {
-                          _services.insert(
-                            0,
-                            JasaModel(
-                              id: DateTime.now().millisecondsSinceEpoch.toString(),
-                              name: name,
-                              price: price,
-                              lastEdited: 'Baru saja',
-                            ),
-                          );
-                        }
-                      });
+                      final now = DateTime.now();
+                      final timeStr =
+                          'Diedit ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} ${now.day}/${now.month}/${now.year}';
+                      final item = JasaModel(
+                        id: isEdit ? itemToEdit.id : 'js-${DateTime.now().millisecondsSinceEpoch}',
+                        name: name,
+                        price: price,
+                        lastEdited: timeStr,
+                      );
+                      Navigator.pop(ctx);
+                      await JasaService().saveJasa(item);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: const Color(0xFF143322),
+                            content: Text('Layanan "$name" berhasil disimpan ke Firestore!'),
+                          ),
+                        );
+                      }
                     }
-                    Navigator.pop(ctx);
                   },
                   child: Text(
                     isEdit ? 'Simpan Perubahan' : 'Simpan Layanan Jasa',
@@ -364,6 +301,33 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
                 ),
               ),
               const SizedBox(height: 10),
+
+              if (isEdit) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: accentRed,
+                    ),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    label: const Text('Hapus Layanan Jasa', style: TextStyle(fontWeight: FontWeight.w600)),
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await JasaService().deleteJasa(itemToEdit.id);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: const Color(0xFF3B1517),
+                            content: Text('Layanan "${itemToEdit.name}" berhasil dihapus dari Firestore'),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
 
               // Tombol Batal
               SizedBox(
@@ -396,9 +360,12 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filteredServices;
+    return ValueListenableBuilder<List<JasaModel>>(
+      valueListenable: JasaService().servicesNotifier,
+      builder: (context, services, _) {
+        final filtered = _getFilteredServices(services);
 
-    return Scaffold(
+        return Scaffold(
       backgroundColor: bgDark,
       body: SafeArea(
         bottom: false,
@@ -444,7 +411,7 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${_services.length} Jenis Layanan Aktif',
+                              '${services.length} Jenis Layanan Aktif',
                               style: const TextStyle(
                                 color: textMuted,
                                 fontSize: 11,
@@ -645,6 +612,8 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
           ),
         ),
       ),
+    );
+      },
     );
   }
 

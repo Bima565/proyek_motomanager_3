@@ -2,33 +2,11 @@ import 'package:flutter/material.dart';
 import '../../components/back_button_circle.dart';
 import '../../components/moto_bottom_nav.dart';
 import '../../components/rupiah_formatter.dart';
+import '../../services/sparepart_service.dart';
 import '../beranda.dart';
 import 'tambah_sparepart.dart';
 
-class SparepartModel {
-  String id;
-  String name;
-  String category;
-  int buyPrice;
-  int sellPrice;
-  int stock;
-  String unit;
-  String lastUpdated;
-
-  SparepartModel({
-    required this.id,
-    required this.name,
-    required this.category,
-    required this.buyPrice,
-    required this.sellPrice,
-    required this.stock,
-    this.unit = 'Pcs',
-    required this.lastUpdated,
-  });
-
-  bool get isCritical => stock <= 2;
-  bool get isWarning => stock > 2 && stock <= 5;
-}
+export '../../services/sparepart_service.dart' show SparepartModel;
 
 /// Screen Data Sparepart & Stok (FR05)
 class DataSparepartPage extends StatefulWidget {
@@ -70,63 +48,9 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
     'Transmisi CVT',
   ];
 
-  late List<SparepartModel> _spareparts;
-
   @override
   void initState() {
     super.initState();
-    _spareparts = [
-      SparepartModel(
-        id: '1',
-        name: 'Oli Yamalube Silver 0.8L',
-        category: 'Oli & Pelumas',
-        buyPrice: 35000,
-        sellPrice: 45000,
-        stock: 2,
-        unit: 'Pcs',
-        lastUpdated: 'Diedit 14:15 28/9/2026',
-      ),
-      SparepartModel(
-        id: '2',
-        name: 'Kampas Rem Depan Vario/Beat',
-        category: 'Pengereman',
-        buyPrice: 40000,
-        sellPrice: 55000,
-        stock: 3,
-        unit: 'Pcs',
-        lastUpdated: '09:30 25/9/2026',
-      ),
-      SparepartModel(
-        id: '3',
-        name: 'Busi NGK CPR9EA-9',
-        category: 'Kelistrikan',
-        buyPrice: 20000,
-        sellPrice: 30000,
-        stock: 14,
-        unit: 'Pcs',
-        lastUpdated: 'Diedit 16:45 27/9/2026',
-      ),
-      SparepartModel(
-        id: '4',
-        name: 'Ban Luar Tubeless FDR 90/90-14',
-        category: 'Ban & Roda',
-        buyPrice: 150000,
-        sellPrice: 185000,
-        stock: 18,
-        unit: 'Pcs',
-        lastUpdated: '11:20 18/9/2026',
-      ),
-      SparepartModel(
-        id: '5',
-        name: 'Roller Set Honda Beat FI (11g)',
-        category: 'Transmisi CVT',
-        buyPrice: 28000,
-        sellPrice: 40000,
-        stock: 8,
-        unit: 'Set',
-        lastUpdated: 'Diedit 10:10 29/9/2026',
-      ),
-    ];
   }
 
   @override
@@ -145,84 +69,81 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
       ),
     );
 
-    if (result != null) {
-      setState(() {
-        _spareparts.insert(0, result);
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFF143322),
-            content: Text('Sparepart "${result.name}" berhasil ditambahkan!'),
-          ),
-        );
-      }
+    if (result != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF143322),
+          content: Text('Sparepart "${result.name}" berhasil disimpan ke Firestore!'),
+        ),
+      );
     }
-  }
-
-  List<SparepartModel> get _filteredSpareparts {
-    return _spareparts.where((item) {
-      final matchCategory = _selectedCategory == 'Semua' ||
-          item.category.toLowerCase().contains(_selectedCategory.toLowerCase());
-      final matchQuery = _searchController.text.isEmpty ||
-          item.name.toLowerCase().contains(_searchController.text.toLowerCase()) ||
-          item.category.toLowerCase().contains(_searchController.text.toLowerCase());
-      return matchCategory && matchQuery;
-    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filteredSpareparts;
-    final totalKritis = _spareparts.where((s) => s.isCritical || s.isWarning).length;
+    return ValueListenableBuilder<List<SparepartModel>>(
+      valueListenable: SparepartService().sparepartsNotifier,
+      builder: (context, spareparts, _) {
+        final filtered = spareparts.where((item) {
+          final matchCategory = _selectedCategory == 'Semua' ||
+              item.category.toLowerCase().contains(_selectedCategory.toLowerCase());
+          final matchQuery = _searchController.text.isEmpty ||
+              item.name.toLowerCase().contains(_searchController.text.toLowerCase()) ||
+              item.category.toLowerCase().contains(_searchController.text.toLowerCase());
+          return matchCategory && matchQuery;
+        }).toList();
 
-    return Scaffold(
-      backgroundColor: bgDark,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // 1. Header (Tombol Kembali, Judul, Subjudul)
-            _buildHeader(totalKritis),
+        final totalKritis = spareparts.where((s) => s.isCritical || s.isWarning).length;
 
-            // 2. Search Bar
-            _buildSearchBar(),
+        return Scaffold(
+          backgroundColor: bgDark,
+          body: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                // 1. Header (Tombol Kembali, Judul, Subjudul)
+                _buildHeader(spareparts.length, totalKritis),
 
-            // 3. Filter Kategori Chips
-            _buildCategoryFilter(),
+                // 2. Search Bar
+                _buildSearchBar(),
 
-            // 4. Daftar Sparepart Cards
-            Expanded(
-              child: filtered.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'Tidak ada sparepart yang sesuai.',
-                        style: TextStyle(color: textDim, fontSize: 13),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        return _buildSparepartCard(filtered[index]);
-                      },
-                    ),
+                // 3. Filter Kategori Chips
+                _buildCategoryFilter(),
+
+                // 4. Daftar Sparepart Cards
+                Expanded(
+                  child: filtered.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'Tidak ada sparepart yang sesuai.',
+                            style: TextStyle(color: textDim, fontSize: 13),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            return _buildSparepartCard(filtered[index]);
+                          },
+                        ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-      floatingActionButton: _buildFab(),
-      bottomNavigationBar: MotoBottomNav(
-        currentIndex: 2,
-        userData: widget.userData,
-      ),
+          ),
+          floatingActionButton: _buildFab(),
+          bottomNavigationBar: MotoBottomNav(
+            currentIndex: 2,
+            userData: widget.userData,
+          ),
+        );
+      },
     );
   }
 
   // --- WIDGET KOMPONEN ---
 
-  Widget _buildHeader(int totalKritis) {
+  Widget _buildHeader(int totalProduk, int totalKritis) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Row(
@@ -260,7 +181,7 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
               ),
               const SizedBox(height: 2),
               Text(
-                '${_spareparts.length} Total Produk • $totalKritis Kritis',
+                '$totalProduk Total Produk • $totalKritis Kritis',
                 style: const TextStyle(
                   color: textMuted,
                   fontSize: 11,
@@ -503,6 +424,206 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
     );
   }
 
+  void _showEditSparepartModal(SparepartModel item) {
+    final nameCtrl = TextEditingController(text: item.name);
+    final buyPriceCtrl = TextEditingController(text: item.buyPrice.toString());
+    final sellPriceCtrl = TextEditingController(text: item.sellPrice.toString());
+    final stockCtrl = TextEditingController(text: item.stock.toString());
+    String selectedCat = item.category;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        side: BorderSide(color: cardBorder),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: textDim.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Edit Data Sparepart',
+                style: TextStyle(color: textWhite, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 14),
+              const Text('Nama Sparepart', style: TextStyle(color: textMuted, fontSize: 11)),
+              const SizedBox(height: 4),
+              TextField(
+                controller: nameCtrl,
+                style: const TextStyle(color: textWhite, fontSize: 13),
+                decoration: _buildInputDeco('Nama sparepart'),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Harga Beli', style: TextStyle(color: textMuted, fontSize: 11)),
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: buyPriceCtrl,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: accentGreen, fontSize: 13, fontWeight: FontWeight.bold),
+                          decoration: _buildInputDeco('0', prefix: 'Rp '),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Harga Jual', style: TextStyle(color: textMuted, fontSize: 11)),
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: sellPriceCtrl,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: accentGreen, fontSize: 13, fontWeight: FontWeight.bold),
+                          decoration: _buildInputDeco('0', prefix: 'Rp '),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Stok Saat Ini', style: TextStyle(color: textMuted, fontSize: 11)),
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: stockCtrl,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: textWhite, fontSize: 13),
+                          decoration: _buildInputDeco('0'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Kategori', style: TextStyle(color: textMuted, fontSize: 11)),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: bgDark,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: cardBorder),
+                          ),
+                          child: DropdownButton<String>(
+                            value: _categories.skip(1).contains(selectedCat) ? selectedCat : _categories[1],
+                            isExpanded: true,
+                            underline: const SizedBox(),
+                            dropdownColor: cardBg,
+                            style: const TextStyle(color: textWhite, fontSize: 12),
+                            items: _categories.skip(1).map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                            onChanged: (val) {
+                              if (val != null) setModalState(() => selectedCat = val);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentRed,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () async {
+                    final name = nameCtrl.text.trim();
+                    final bp = int.tryParse(buyPriceCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? item.buyPrice;
+                    final sp = int.tryParse(sellPriceCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? item.sellPrice;
+                    final st = int.tryParse(stockCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? item.stock;
+
+                    if (name.isNotEmpty) {
+                      final now = DateTime.now();
+                      final updated = SparepartModel(
+                        id: item.id,
+                        name: name,
+                        category: selectedCat,
+                        buyPrice: bp,
+                        sellPrice: sp,
+                        stock: st,
+                        unit: item.unit,
+                        lastUpdated:
+                            'Diedit ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} ${now.day}/${now.month}/${now.year}',
+                      );
+                      final messenger = ScaffoldMessenger.of(context);
+                      Navigator.pop(ctx);
+                      await SparepartService().saveSparepart(updated);
+                      messenger.showSnackBar(
+                        SnackBar(
+                          backgroundColor: const Color(0xFF143322),
+                          content: Text('${updated.name} berhasil diperbarui di Firestore!'),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Simpan Perubahan', style: TextStyle(color: textWhite, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDeco(String hint, {String? prefix}) {
+    return InputDecoration(
+      hintText: hint,
+      prefixText: prefix,
+      prefixStyle: const TextStyle(color: accentGreen, fontWeight: FontWeight.bold),
+      hintStyle: const TextStyle(color: textDim, fontSize: 12),
+      filled: true,
+      fillColor: bgDark,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: cardBorder)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: cardBorder)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: accentRed)),
+    );
+  }
+
   void _showItemActions(SparepartModel item) {
     showModalBottomSheet(
       context: context,
@@ -539,27 +660,24 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
               title: const Text('Edit Sparepart', style: TextStyle(color: textWhite, fontSize: 13.5)),
               onTap: () {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    backgroundColor: cardBg,
-                    content: Text('Edit data ${item.name}'),
-                  ),
-                );
+                _showEditSparepartModal(item);
               },
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline_rounded, color: accentRed),
               title: const Text('Hapus Sparepart',
                   style: TextStyle(color: accentRed, fontSize: 13.5, fontWeight: FontWeight.w600)),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(ctx);
-                setState(() => _spareparts.remove(item));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    backgroundColor: const Color(0xFF3B1517),
-                    content: Text('${item.name} berhasil dihapus'),
-                  ),
-                );
+                await SparepartService().deleteSparepart(item.id);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: const Color(0xFF3B1517),
+                      content: Text('${item.name} berhasil dihapus dari Firestore'),
+                    ),
+                  );
+                }
               },
             ),
             const SizedBox(height: 8),

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../components/custom_calendar_dialog.dart';
 import '../components/moto_bottom_nav.dart';
 import '../components/rupiah_formatter.dart';
+import '../services/pembelian_service.dart';
 import '../services/transaksi_service.dart';
 import 'transaksi/kasir_transaksi.dart';
 import 'transaksi/nota_pembayaran.dart';
@@ -78,109 +80,6 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
   // Filter Metode Pembayaran (khusus penjualan): 'Semua' | 'QRIS' | 'TUNAI'
   String _selectedPayment = 'Semua';
 
-  // Seed Data Transaksi Pembelian / Restock (Screen 12B)
-  final List<PembelianRecord> _purchaseTransactions = [
-    PembelianRecord(
-      code: '#BELI-005',
-      dateTime: DateTime(2026, 10, 5),
-      buyerName: 'Sugeng Yulianto',
-      supplier: 'Toko Sumber Jaya',
-      items: [
-        RestockItemModel(
-          id: '1',
-          name: 'Velg Jari-jari 125',
-          category: 'velg',
-          buyPrice: 350000,
-          quantity: 2,
-        ),
-        RestockItemModel(
-          id: '2',
-          name: 'Jari-jari TDR Chrome',
-          category: 'velg',
-          buyPrice: 65000,
-          quantity: 4,
-        ),
-      ],
-      totalAmount: 960000,
-      status: 'LUNAS',
-    ),
-    PembelianRecord(
-      code: '#BELI-004',
-      dateTime: DateTime(2026, 10, 12),
-      buyerName: 'Sugeng Yulianto',
-      supplier: 'CV Maju Motor',
-      items: [
-        RestockItemModel(
-          id: '3',
-          name: 'Busi Champion RG6YC',
-          category: 'kelistrikan',
-          buyPrice: 15000,
-          quantity: 20,
-        ),
-      ],
-      totalAmount: 300000,
-      status: 'LUNAS',
-    ),
-    PembelianRecord(
-      code: '#BELI-003',
-      dateTime: DateTime(2026, 10, 18),
-      buyerName: 'Sugeng Yulianto',
-      supplier: 'Distributor Federal',
-      items: [
-        RestockItemModel(
-          id: '4',
-          name: 'Federal Ultratec 20W-50 0.8L',
-          category: 'oli',
-          buyPrice: 38000,
-          quantity: 24,
-        ),
-      ],
-      totalAmount: 912000,
-      status: 'LUNAS',
-    ),
-    PembelianRecord(
-      code: '#BELI-002',
-      dateTime: DateTime(2026, 10, 22),
-      buyerName: 'Sugeng Yulianto',
-      supplier: 'PT Astra Otoparts',
-      items: [
-        RestockItemModel(
-          id: '5',
-          name: 'Kampas Ganda Vario 125/150',
-          category: 'cvt',
-          buyPrice: 95000,
-          quantity: 6,
-        ),
-        RestockItemModel(
-          id: '6',
-          name: 'V-Belt Gates Powerlink Beat ESP',
-          category: 'cvt',
-          buyPrice: 90000,
-          quantity: 3,
-        ),
-      ],
-      totalAmount: 840000,
-      status: 'LUNAS',
-    ),
-    PembelianRecord(
-      code: '#BELI-001',
-      dateTime: DateTime(2026, 10, 26),
-      buyerName: 'Sugeng Yulianto',
-      supplier: 'Grosir Jaya Part',
-      items: [
-        RestockItemModel(
-          id: '7',
-          name: 'Roller Set Honda Beat FI (11g)',
-          category: 'cvt',
-          buyPrice: 28000,
-          quantity: 12,
-        ),
-      ],
-      totalAmount: 480000,
-      status: 'LUNAS',
-    ),
-  ];
-
   String _formatRupiah(int nominal) => formatRupiah(nominal);
 
   String _formatDateIso(DateTime d) {
@@ -245,8 +144,8 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
     }).toList();
   }
 
-  List<PembelianRecord> get _filteredPurchases {
-    return _purchaseTransactions.where((p) {
+  List<PembelianRecord> _filterPurchases(List<PembelianRecord> allList) {
+    return allList.where((p) {
       if (_selectedQuickPeriod == 'Semua') {
         return true;
       }
@@ -260,35 +159,331 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
   }
 
   void _openTambahPembelian() async {
-    final newBeli = await Navigator.push<PembelianRecord>(
+    await Navigator.push<PembelianRecord>(
       context,
       MaterialPageRoute(
         builder: (context) => PengadaanRestockPage(userData: widget.userData),
       ),
     );
-
-    if (newBeli != null) {
-      setState(() {
-        _purchaseTransactions.insert(0, newBeli);
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFF143322),
-            content: Text('Pembelian baru ${newBeli.code} berhasil dicatat!'),
-          ),
-        );
-      }
-    }
   }
+
+  void _sharePurchaseWhatsApp(BuildContext context, PembelianRecord item) {
+    final buffer = StringBuffer();
+    buffer.writeln('*BENGKEL ZALZABILA MOTOR*');
+    buffer.writeln('Jl. Raya Industri No. 45 • Telp/WA: 0812-3456-7890');
+    buffer.writeln('----------------------------------------');
+    buffer.writeln('*BUKTI PENGADAAN & RESTOCK BARANG*');
+    buffer.writeln('No. Bukti : ${item.code}');
+    buffer.writeln('Tanggal   : ${item.dateFormatted}');
+    buffer.writeln('Supplier  : ${item.supplier}');
+    buffer.writeln('PIC       : ${item.buyerName}');
+    buffer.writeln('----------------------------------------');
+    buffer.writeln('*RINCIAN PASOKAN BARANG:*');
+    for (int i = 0; i < item.items.length; i++) {
+      final it = item.items[i];
+      buffer.writeln('${i + 1}. ${it.name}');
+      buffer.writeln('   ${it.quantity} ${it.unit} x ${_formatRupiah(it.buyPrice)} = ${_formatRupiah(it.subtotal)}');
+    }
+    buffer.writeln('----------------------------------------');
+    buffer.writeln('*TOTAL MODAL: ${_formatRupiah(item.totalAmount)}*');
+    buffer.writeln('Status    : ${item.status}');
+
+    Clipboard.setData(ClipboardData(text: buffer.toString()));
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: Color(0xFF143322),
+        content: Text('Rincian pembelian disalin ke clipboard! Siap dibagikan ke WhatsApp.'),
+      ),
+    );
+  }
+
+  void _showPurchaseDetailSheet(BuildContext context, PembelianRecord item) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          decoration: const BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(top: BorderSide(color: cardBorder, width: 1.5)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Drag handle
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: textDim,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+
+                // Header: No Bukti, Tanggal & Jam, Badge LUNAS
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.code,
+                          style: const TextStyle(
+                            color: textWhite,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.timeFormatted,
+                          style: const TextStyle(color: textDim, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF334155)),
+                      ),
+                      child: Text(
+                        item.status,
+                        style: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Info Supplier & PIC Card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: inputBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: cardBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Supplier / Toko', style: TextStyle(color: textDim, fontSize: 10)),
+                            const SizedBox(height: 2),
+                            Text(
+                              item.supplier,
+                              style: const TextStyle(
+                                color: textWhite,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(width: 1, height: 28, color: cardBorder),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Penanggung Jawab', style: TextStyle(color: textDim, fontSize: 10)),
+                            const SizedBox(height: 2),
+                            Text(
+                              item.buyerName,
+                              style: const TextStyle(
+                                color: textWhite,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Rincian Pasokan Restock
+                Text(
+                  'Rincian Pasokan (${item.items.length} Barang)',
+                  style: const TextStyle(
+                    color: textWhite,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Item List
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 220),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: item.items.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 6),
+                    itemBuilder: (context, idx) {
+                      final it = item.items[idx];
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: inputBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: cardBorder),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  it.name,
+                                  style: const TextStyle(
+                                    color: textWhite,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${it.quantity} ${it.unit} × ${_formatRupiah(it.buyPrice)} • ${it.category}',
+                                  style: const TextStyle(color: textDim, fontSize: 10.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            _formatRupiah(it.subtotal),
+                            style: const TextStyle(
+                              color: Color(0xFFF87171),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Total Modal Pengadaan Box
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1418),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF4C1D24)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Total Modal Pembelian',
+                          style: TextStyle(color: textMuted, fontSize: 11),
+                        ),
+                        Text(
+                          '${item.totalQuantity} total item',
+                          style: const TextStyle(color: textDim, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      _formatRupiah(item.totalAmount),
+                      style: const TextStyle(
+                        color: Color(0xFFF87171),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Action Buttons: Bagikan Rincian (WA) & Tutup
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        _sharePurchaseWhatsApp(context, item);
+                      },
+                      icon: const Icon(Icons.share_rounded, size: 16, color: Color(0xFF22C55E)),
+                      label: const Text(
+                        'Bagikan (WA)',
+                        style: TextStyle(color: Color(0xFF22C55E), fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF166534)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: cardBorder,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text(
+                        'Tutup',
+                        style: TextStyle(color: textWhite, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<List<TransaksiPenjualanModel>>(
-      valueListenable: TransaksiService().transactionsNotifier,
-      builder: (context, allSalesList, child) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        TransaksiService().transactionsNotifier,
+        PembelianService().pembelianNotifier,
+      ]),
+      builder: (context, child) {
+        final allSalesList = TransaksiService().transactions;
+        final allPurchasesList = PembelianService().pembelianList;
+
         final filteredSales = _filterSales(allSalesList);
-        final filteredPurchases = _filteredPurchases;
+        final filteredPurchases = _filterPurchases(allPurchasesList);
 
         final int totalPenjualan =
             filteredSales.fold(0, (total, t) => total + t.totalBayar);
@@ -729,82 +924,83 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
       itemBuilder: (context, index) {
         final item = list[index];
 
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cardBorder, width: 1),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    '${item.code} • ${item.dateFormatted}',
-                    style: const TextStyle(
-                      color: textDim,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFF334155), width: 1),
-                    ),
-                    child: Text(
-                      item.status,
+        return InkWell(
+          onTap: () => _showPurchaseDetailSheet(context, item),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: cardBorder, width: 1),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '${item.code} • ${item.dateFormatted}',
                       style: const TextStyle(
-                        color: Color(0xFF94A3B8),
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w700,
+                        color: textDim,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    _formatRupiah(item.totalAmount),
-                    style: const TextStyle(
-                      color: Color(0xFFF87171),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF334155), width: 1),
+                      ),
+                      child: Text(
+                        item.status,
+                        style: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Supplier: ${item.supplier}',
-                style: const TextStyle(
-                  color: textWhite,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
+                    const Spacer(),
+                    Text(
+                      _formatRupiah(item.totalAmount),
+                      style: const TextStyle(
+                        color: Color(0xFFF87171),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 5),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      item.summaryItems,
-                      style: const TextStyle(color: textMuted, fontSize: 11),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 8),
+                Text(
+                  '${item.buyerName} • ${item.supplier}',
+                  style: const TextStyle(
+                    color: textWhite,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.summaryItems,
+                        style: const TextStyle(color: textMuted, fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'PIC: ${item.buyerName}',
-                    style: const TextStyle(color: textDim, fontSize: 10),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 8),
+                    const Text('›', style: TextStyle(color: textMuted, fontSize: 16)),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },

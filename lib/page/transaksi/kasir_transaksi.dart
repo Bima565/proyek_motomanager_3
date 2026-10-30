@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../components/back_button_circle.dart';
 import '../../components/rupiah_formatter.dart';
+import '../../services/jasa_service.dart';
+import '../../services/sparepart_service.dart';
 import '../../services/transaksi_service.dart';
 import 'nota_pembayaran.dart';
 
@@ -31,10 +33,10 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
   static const Color textDim = Color(0xFF64748B);
 
   // Data Pelanggan & Motor
-  String _customerName = 'Bpk. Rahmat Santoso';
-  String _vehicleInfo = 'Honda Vario 160';
-  String _policeNumber = 'B 4921 KDF';
-  String _customerPhone = '081234567890';
+  String _customerName = 'Pelanggan Umum';
+  String _vehicleInfo = '-';
+  String _policeNumber = '-';
+  String _customerPhone = '-';
   late String _trxCode;
 
   // Metode Pembayaran ('Tunai' atau 'QRIS')
@@ -42,7 +44,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
 
   // Controller Uang Tunai Diterima
   final TextEditingController _cashReceivedController =
-      TextEditingController(text: '200000');
+      TextEditingController();
 
   // Daftar Item Transaksi
   late List<TransaksiItemModel> _items;
@@ -51,35 +53,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
   void initState() {
     super.initState();
     _trxCode = TransaksiService().generateTrxCode();
-    _items = [
-      TransaksiItemModel(
-        id: '1',
-        name: 'Jasa Servis Lengkap + Tune Up',
-        category: 'Jasa Servis',
-        subInfo: 'Ongkos Mekanik',
-        price: 80000,
-        quantity: 1,
-        isService: true,
-      ),
-      TransaksiItemModel(
-        id: '2',
-        name: 'Oli Shell Advance AX7 0.8L',
-        category: 'Oli & Pelumas',
-        subInfo: 'Sisa: 12',
-        price: 65000,
-        quantity: 1,
-        isService: false,
-      ),
-      TransaksiItemModel(
-        id: '3',
-        name: 'Busi NGK CPR9EA-9',
-        category: 'Kelistrikan',
-        subInfo: 'Sisa: 18',
-        price: 30000,
-        quantity: 1,
-        isService: false,
-      ),
-    ];
+    _items = [];
   }
 
   @override
@@ -191,92 +165,23 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
 
   void _showPickFromHistorySheet() {
     String selectedCategory = 'Semua';
-    final historyItems = [
-      {
-        'name': 'Jasa Servis Lengkap + Tune Up',
-        'category': 'Jasa Servis',
-        'price': 80000,
-        'isService': true,
-        'subInfo': 'Ongkos Mekanik',
-      },
-      {
-        'name': 'Servis Ringan + Ganti Oli MPX2',
-        'category': 'Jasa Servis',
-        'price': 65000,
-        'isService': true,
-        'subInfo': 'Servis Rutin',
-      },
-      {
-        'name': 'Oli Shell Advance AX7 0.8L',
-        'category': 'Sparepart',
-        'price': 65000,
-        'isService': false,
-        'subInfo': 'Sisa: 12',
-      },
-      {
-        'name': 'Busi NGK CPR9EA-9',
-        'category': 'Sparepart',
-        'price': 30000,
-        'isService': false,
-        'subInfo': 'Sisa: 18',
-      },
-      {
-        'name': 'Ganti Kampas Rem Belakang',
-        'category': 'Sparepart',
-        'price': 40000,
-        'isService': false,
-        'subInfo': 'Pengereman',
-      },
-      {
-        'name': 'Kampas Rem Depan Vario/Beat',
-        'category': 'Sparepart',
-        'price': 55000,
-        'isService': false,
-        'subInfo': 'Pengereman • Sisa: 5',
-      },
-      {
-        'name': 'Bersihkan Injektor & Throttle Body',
-        'category': 'Jasa Servis',
-        'price': 50000,
-        'isService': true,
-        'subInfo': 'Injeksi System',
-      },
-      {
-        'name': 'Tambal Tubeless + Cairan Ban',
-        'category': 'Jasa Servis',
-        'price': 35000,
-        'isService': true,
-        'subInfo': 'Ban & Velg',
-      },
-      {
-        'name': 'Servis CVT + Ganti Roller',
-        'category': 'Jasa Servis',
-        'price': 90000,
-        'isService': true,
-        'subInfo': 'Transmisi Otomatis',
-      },
-      {
-        'name': 'Stel Klep & Rantai Roda',
-        'category': 'Jasa Servis',
-        'price': 30000,
-        'isService': true,
-        'subInfo': 'Mesin',
-      },
-      {
-        'name': 'Oli Yamalube Silver 0.8L',
-        'category': 'Sparepart',
-        'price': 45000,
-        'isService': false,
-        'subInfo': 'Sisa: 8',
-      },
-      {
-        'name': 'Ban Luar Tubeless FDR 90/90-14',
-        'category': 'Sparepart',
-        'price': 185000,
-        'isService': false,
-        'subInfo': 'Sisa: 14',
-      },
-    ];
+    final jasaItems = JasaService().services.map((j) => {
+          'name': j.name,
+          'category': 'Jasa Servis',
+          'price': j.price,
+          'isService': true,
+          'subInfo': 'Jasa Servis',
+        }).toList();
+
+    final sparepartItems = SparepartService().spareparts.map((s) => {
+          'name': s.name,
+          'category': 'Sparepart',
+          'price': s.sellPrice,
+          'isService': false,
+          'subInfo': '${s.category} • Sisa: ${s.stock}',
+        }).toList();
+
+    final historyItems = [...jasaItems, ...sparepartItems];
 
     final categories = ['Semua', 'Jasa Servis', 'Sparepart'];
 
@@ -525,7 +430,57 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
+              // Pilihan Cepat dari Katalog Firestore
+              Builder(
+                builder: (context) {
+                  final services = JasaService().services;
+                  final parts = SparepartService().spareparts;
+                  final suggestions = isJasa
+                      ? services.map((s) => {'name': s.name, 'price': s.price}).toList()
+                      : parts.map((p) => {'name': p.name, 'price': p.sellPrice}).toList();
+
+                  if (suggestions.isEmpty) return const SizedBox.shrink();
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Pilih Cepat dari Katalog:', style: TextStyle(color: textDim, fontSize: 10)),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        height: 28,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: suggestions.length.clamp(0, 6),
+                          separatorBuilder: (_, _) => const SizedBox(width: 6),
+                          itemBuilder: (context, idx) {
+                            final sug = suggestions[idx];
+                            final sName = sug['name'] as String;
+                            final sPrice = sug['price'] as int;
+                            return ActionChip(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              visualDensity: VisualDensity.compact,
+                              backgroundColor: bgDark,
+                              side: const BorderSide(color: cardBorder),
+                              label: Text(
+                                sName,
+                                style: const TextStyle(color: textMuted, fontSize: 10),
+                              ),
+                              onPressed: () {
+                                setDialogState(() {
+                                  nameCtrl.text = sName;
+                                  priceCtrl.text = sPrice.toString();
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  );
+                },
+              ),
               Text(isJasa ? 'Nama Jasa Servis' : 'Nama Sparepart',
                   style: const TextStyle(color: textMuted, fontSize: 11)),
               const SizedBox(height: 6),
@@ -799,10 +754,32 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
               const SizedBox(height: 12),
 
               // Daftar Item Cards
-              ..._items.map((item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _buildItemCard(item),
-                  )),
+              if (_items.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: cardBorder),
+                  ),
+                  child: Column(
+                    children: const [
+                      Icon(Icons.remove_shopping_cart_outlined, color: textDim, size: 36),
+                      SizedBox(height: 8),
+                      Text(
+                        'Belum ada item ditambahkan',
+                        style: TextStyle(color: textMuted, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                ..._items.map((item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildItemCard(item),
+                    )),
 
               // Tombol Tambah Item Transaksi Lainnya
               GestureDetector(

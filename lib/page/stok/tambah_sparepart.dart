@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../components/back_button_circle.dart';
-import 'data_sparepart.dart';
+import '../../services/sparepart_service.dart';
 
 class TambahSparepartPage extends StatefulWidget {
   const TambahSparepartPage({super.key});
@@ -21,12 +21,9 @@ class _TambahSparepartPageState extends State<TambahSparepartPage> {
   static const Color textDim = Color(0xFF6B7280);
 
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController =
-      TextEditingController(text: 'Oli Yamalube Silver 0.8L');
-  final TextEditingController _buyPriceController =
-      TextEditingController(text: '35000');
-  final TextEditingController _sellPriceController =
-      TextEditingController(text: '45000');
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _buyPriceController = TextEditingController();
+  final TextEditingController _sellPriceController = TextEditingController();
 
   String _selectedCategory = 'Oli & Pelumas Mesin';
 
@@ -46,7 +43,7 @@ class _TambahSparepartPageState extends State<TambahSparepartPage> {
     super.dispose();
   }
 
-  void _handleSave() {
+  void _handleSave() async {
     if (_formKey.currentState!.validate()) {
       final name = _nameController.text.trim();
       final buyPrice = int.tryParse(_buyPriceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
@@ -56,7 +53,7 @@ class _TambahSparepartPageState extends State<TambahSparepartPage> {
       final dateStr = 'Diedit ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} ${now.day}/${now.month}/${now.year}';
 
       final newSparepart = SparepartModel(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: 'sp-${DateTime.now().millisecondsSinceEpoch}',
         name: name,
         category: _selectedCategory.replaceAll(' Mesin', ''),
         buyPrice: buyPrice,
@@ -66,7 +63,11 @@ class _TambahSparepartPageState extends State<TambahSparepartPage> {
         lastUpdated: dateStr,
       );
 
-      Navigator.pop(context, newSparepart);
+      await SparepartService().saveSparepart(newSparepart);
+
+      if (mounted) {
+        Navigator.pop(context, newSparepart);
+      }
     }
   }
 

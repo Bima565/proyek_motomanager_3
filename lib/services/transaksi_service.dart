@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'sparepart_service.dart';
 
 class TransaksiItemModel {
   String id;
@@ -170,193 +171,16 @@ class TransaksiService {
   factory TransaksiService() => _instance;
 
   TransaksiService._internal() {
-    _initSeedTransactions();
     _listenFirestore();
   }
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Reactive state notifier untuk list transaksi lokal
+  // Reactive state notifier untuk list transaksi lokal (murni bersumber dari Cloud Firestore)
   final ValueNotifier<List<TransaksiPenjualanModel>> transactionsNotifier =
       ValueNotifier<List<TransaksiPenjualanModel>>([]);
 
   List<TransaksiPenjualanModel> get transactions => transactionsNotifier.value;
-
-  void _initSeedTransactions() {
-    // Sesuai Penpot Screen 12 & Screen 3
-    final initialList = [
-      TransaksiPenjualanModel(
-        id: 'seed-026',
-        code: 'TRX-20260929-026',
-        dateTime: DateTime(2026, 9, 29, 10, 45),
-        customerName: 'Bpk. Rahmat Santoso',
-        vehicleInfo: 'Honda Vario 160',
-        policeNumber: 'B 4921 KDF',
-        customerPhone: '081234567890',
-        kasirName: 'Sri Ekowati',
-        items: [
-          TransaksiItemModel(
-            id: '1',
-            name: 'Jasa Servis Lengkap + Tune Up',
-            category: 'Jasa Servis',
-            subInfo: 'Ongkos Mekanik',
-            price: 80000,
-            quantity: 1,
-            isService: true,
-          ),
-          TransaksiItemModel(
-            id: '2',
-            name: 'Oli Shell Advance AX7 0.8L',
-            category: 'Oli & Pelumas',
-            subInfo: 'Sisa: 12',
-            price: 65000,
-            quantity: 1,
-            isService: false,
-          ),
-          TransaksiItemModel(
-            id: '3',
-            name: 'Busi NGK CPR9EA-9',
-            category: 'Kelistrikan',
-            subInfo: 'Sisa: 18',
-            price: 30000,
-            quantity: 1,
-            isService: false,
-          ),
-        ],
-        totalBayar: 175000,
-        paymentMethod: 'Tunai',
-        tunaiDiterima: 200000,
-        kembalian: 25000,
-      ),
-      TransaksiPenjualanModel(
-        id: 'seed-005',
-        code: '#TRX-005',
-        dateTime: DateTime(2026, 9, 20, 8, 30),
-        customerName: 'Dian Pratama',
-        vehicleInfo: 'Yamaha NMAX',
-        policeNumber: 'B 3108 TFD',
-        customerPhone: '081399887766',
-        kasirName: 'Sri Ekowati',
-        items: [
-          TransaksiItemModel(
-            id: 's-1',
-            name: 'Tambal Tubeless + Cairan Ban',
-            category: 'Jasa Servis',
-            subInfo: 'Ban & Velg',
-            price: 40000,
-            quantity: 1,
-            isService: true,
-          ),
-        ],
-        totalBayar: 40000,
-        paymentMethod: 'QRIS',
-        tunaiDiterima: 40000,
-        kembalian: 0,
-      ),
-      TransaksiPenjualanModel(
-        id: 'seed-004',
-        code: '#TRX-004',
-        dateTime: DateTime(2026, 9, 20, 10, 15),
-        customerName: 'Rudi Hartono',
-        vehicleInfo: 'Honda Supra X 125',
-        policeNumber: 'B 5821 SKA',
-        customerPhone: '081277665544',
-        kasirName: 'Sri Ekowati',
-        items: [
-          TransaksiItemModel(
-            id: 's-2',
-            name: 'Bersihkan Karburator + Rantai Roda',
-            category: 'Jasa Servis',
-            subInfo: 'Mesin & Penggerak',
-            price: 95000,
-            quantity: 1,
-            isService: true,
-          ),
-        ],
-        totalBayar: 95000,
-        paymentMethod: 'Tunai',
-        tunaiDiterima: 100000,
-        kembalian: 5000,
-      ),
-      TransaksiPenjualanModel(
-        id: 'seed-003',
-        code: '#TRX-003',
-        dateTime: DateTime(2026, 9, 19, 14, 20),
-        customerName: 'Ibu Sri Wahyuni',
-        vehicleInfo: 'Yamaha Mio M3',
-        policeNumber: 'B 6940 PLM',
-        customerPhone: '085711223344',
-        kasirName: 'Sri Ekowati',
-        items: [
-          TransaksiItemModel(
-            id: 's-3',
-            name: 'Ganti Oli Mesin & Gardan',
-            category: 'Jasa Servis',
-            subInfo: 'Pelumas Rutin',
-            price: 80000,
-            quantity: 1,
-            isService: true,
-          ),
-        ],
-        totalBayar: 80000,
-        paymentMethod: 'Tunai',
-        tunaiDiterima: 80000,
-        kembalian: 0,
-      ),
-      TransaksiPenjualanModel(
-        id: 'seed-002',
-        code: '#TRX-002',
-        dateTime: DateTime(2026, 9, 18, 11, 0),
-        customerName: 'Ahmad Fauzi',
-        vehicleInfo: 'Honda Vario 160',
-        policeNumber: 'B 4120 JKT',
-        customerPhone: '087855443322',
-        kasirName: 'Sri Ekowati',
-        items: [
-          TransaksiItemModel(
-            id: 's-4',
-            name: 'Servis CVT & Rem + Roller + Kampas',
-            category: 'Jasa Servis',
-            subInfo: 'Paket Servis',
-            price: 130000,
-            quantity: 1,
-            isService: true,
-          ),
-        ],
-        totalBayar: 130000,
-        paymentMethod: 'QRIS',
-        tunaiDiterima: 130000,
-        kembalian: 0,
-      ),
-      TransaksiPenjualanModel(
-        id: 'seed-001',
-        code: '#TRX-001',
-        dateTime: DateTime(2026, 9, 17, 9, 10),
-        customerName: 'Budi Santoso',
-        vehicleInfo: 'Honda Beat FI',
-        policeNumber: 'B 3844 KTY',
-        customerPhone: '081299001122',
-        kasirName: 'Sri Ekowati',
-        items: [
-          TransaksiItemModel(
-            id: 's-5',
-            name: 'Servis Ringan + Oli MPX2 + Busi',
-            category: 'Jasa Servis',
-            subInfo: 'Servis Berkala',
-            price: 105000,
-            quantity: 1,
-            isService: true,
-          ),
-        ],
-        totalBayar: 105000,
-        paymentMethod: 'Tunai',
-        tunaiDiterima: 110000,
-        kembalian: 5000,
-      ),
-    ];
-
-    transactionsNotifier.value = initialList;
-  }
 
   void _listenFirestore() {
     try {
@@ -366,28 +190,14 @@ class TransaksiService {
           .snapshots()
           .listen(
         (snapshot) {
-          if (snapshot.docs.isEmpty) return;
-
           final firestoreList = snapshot.docs
               .map((doc) => TransaksiPenjualanModel.fromFirestore(doc))
               .toList();
 
-          // Gabungkan data Firestore dengan seed yang belum tersimpan di Firestore
-          final currentMap = <String, TransaksiPenjualanModel>{};
-          for (final t in transactionsNotifier.value) {
-            currentMap[t.code] = t;
-          }
-          for (final t in firestoreList) {
-            currentMap[t.code] = t;
-          }
-
-          final combined = currentMap.values.toList()
-            ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
-
-          transactionsNotifier.value = combined;
+          transactionsNotifier.value = firestoreList;
         },
         onError: (err) {
-          debugPrint('Firestore transaksi stream offline/fallback: $err');
+          debugPrint('Firestore transaksi stream offline/error: $err');
         },
       );
     } catch (e) {
@@ -412,32 +222,20 @@ class TransaksiService {
     final updatedList = [trx, ...transactionsNotifier.value];
     transactionsNotifier.value = updatedList;
 
-    // 2. Simpan secara asinkron ke Firestore
+    // 2. Potong stok sparepart yang terjual
+    for (final item in trx.items) {
+      if (!item.isService) {
+        SparepartService().adjustStock(item.name, -item.quantity);
+      }
+    }
+
+    // 3. Simpan secara asinkron ke Firestore
     try {
-      final docRef = await _firestore.collection('transaksi_penjualan').add(trx.toMap());
-      final syncedTrx = TransaksiPenjualanModel(
-        id: docRef.id,
-        code: trx.code,
-        dateTime: trx.dateTime,
-        customerName: trx.customerName,
-        vehicleInfo: trx.vehicleInfo,
-        policeNumber: trx.policeNumber,
-        customerPhone: trx.customerPhone,
-        kasirName: trx.kasirName,
-        items: trx.items,
-        totalBayar: trx.totalBayar,
-        paymentMethod: trx.paymentMethod,
-        tunaiDiterima: trx.tunaiDiterima,
-        kembalian: trx.kembalian,
-        status: trx.status,
-      );
-      // Update item di memory jika ID berubah
-      final mapped = transactionsNotifier.value.map((t) {
-        if (t.code == trx.code) return syncedTrx;
-        return t;
-      }).toList();
-      transactionsNotifier.value = mapped;
-      return syncedTrx;
+      await _firestore
+          .collection('transaksi_penjualan')
+          .doc(trx.code)
+          .set(trx.toMap());
+      return trx;
     } catch (e) {
       debugPrint('Firestore saveTransaksi failed (local saved): $e');
       return trx;

@@ -1,56 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../components/back_button_circle.dart';
+import '../../components/custom_calendar_dialog.dart';
+import '../../components/rupiah_formatter.dart';
+import '../../services/pembelian_service.dart';
+import '../../services/sparepart_service.dart';
 
-class RestockItemModel {
-  String id;
-  String name;
-  String category;
-  int buyPrice;
-  int quantity;
-  String unit;
-
-  RestockItemModel({
-    required this.id,
-    required this.name,
-    required this.category,
-    required this.buyPrice,
-    required this.quantity,
-    this.unit = 'pcs',
-  });
-
-  int get subtotal => buyPrice * quantity;
-}
-
-class PembelianRecord {
-  final String code;
-  final DateTime dateTime;
-  final String buyerName;
-  final String supplier;
-  final List<RestockItemModel> items;
-  final int totalAmount;
-  final String status; // 'LUNAS'
-
-  PembelianRecord({
-    required this.code,
-    required this.dateTime,
-    required this.buyerName,
-    required this.supplier,
-    required this.items,
-    required this.totalAmount,
-    this.status = 'LUNAS',
-  });
-
-  String get dateFormatted {
-    final d = dateTime.day.toString().padLeft(2, '0');
-    final m = dateTime.month.toString().padLeft(2, '0');
-    final y = dateTime.year;
-    return '$d/$m/$y';
-  }
-
-  String get summaryItems {
-    return items.map((i) => '${i.quantity}x ${i.name}').join(' + ');
-  }
-}
+export '../../services/pembelian_service.dart' show RestockItemModel, PembelianRecord;
 
 /// Screen 14 - (FR10) Pengadaan & Restock Stok Baru
 class PengadaanRestockPage extends StatefulWidget {
@@ -74,59 +29,39 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
   static const Color textMuted = Color(0xFF94A3B8);
   static const Color textDim = Color(0xFF64748B);
 
-  // Koleksi Sparepart untuk dipilih di Dropdown Restock
-  final List<Map<String, dynamic>> _sparepartCatalog = [
-    {
-      'name': 'velg jari-jari supra 125',
-      'category': 'velg',
-      'buyPrice': 90000,
-      'unit': 'pcs',
-    },
-    {
-      'name': 'oli mpx2',
-      'category': 'oli',
-      'buyPrice': 60000,
-      'unit': 'pcs',
-    },
-    {
-      'name': 'Oli Yamalube Silver 0.8L',
-      'category': 'oli',
-      'buyPrice': 35000,
-      'unit': 'pcs',
-    },
-    {
-      'name': 'Kampas Rem Depan Vario/Beat',
-      'category': 'rem',
-      'buyPrice': 40000,
-      'unit': 'pcs',
-    },
-    {
-      'name': 'Busi NGK CPR9EA-9',
-      'category': 'kelistrikan',
-      'buyPrice': 20000,
-      'unit': 'pcs',
-    },
-    {
-      'name': 'Ban Luar Tubeless FDR 90/90-14',
-      'category': 'ban',
-      'buyPrice': 150000,
-      'unit': 'pcs',
-    },
-    {
-      'name': 'Roller Set Honda Beat FI (11g)',
-      'category': 'cvt',
-      'buyPrice': 28000,
-      'unit': 'set',
-    },
-  ];
+  // Koleksi Sparepart untuk dipilih di Dropdown Restock (Terkoneksi langsung ke Firestore SparepartService)
+  List<Map<String, dynamic>> get _sparepartCatalog {
+    final liveSpareparts = SparepartService().spareparts;
+    return liveSpareparts.map((s) => {
+      'name': s.name,
+      'category': s.category,
+      'buyPrice': s.buyPrice,
+      'unit': s.unit.toLowerCase(),
+    }).toList();
+  }
 
-  late String _selectedSparepart;
-  late String _currentCategory;
-  late int _currentBuyPrice;
-  late String _currentUnit;
-  int _currentQty = 10;
+  String? _selectedSparepart;
+  String _currentCategory = '-';
+  int _currentBuyPrice = 0;
+  String _currentUnit = 'pcs';
+  int _currentQty = 1;
 
   final TextEditingController _priceController = TextEditingController();
+
+  // Pemasok / Supplier
+  final List<String> _supplierList = [
+    'Toko Sumber Jaya',
+    'PT Astra Motor Parts',
+    'Distributor Ban FDR',
+    'PT Yamalube Indonesia',
+    'Grosir Jaya Part',
+    'Lainnya (Ketik Manual)',
+  ];
+  String _selectedSupplier = 'Toko Sumber Jaya';
+  final TextEditingController _customSupplierController = TextEditingController();
+
+  // Tanggal Pembelian
+  DateTime _selectedDate = DateTime.now();
 
   // Daftar Pasokan Restock (Keranjang Restock)
   final List<RestockItemModel> _restockList = [];
@@ -134,54 +69,31 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
   @override
   void initState() {
     super.initState();
-    final first = _sparepartCatalog.first;
-    _selectedSparepart = first['name'] as String;
-    _currentCategory = first['category'] as String;
-    _currentBuyPrice = first['buyPrice'] as int;
-    _currentUnit = first['unit'] as String;
-    _priceController.text = _formatNumber(_currentBuyPrice);
-
-    // Initial dummy data sesuai Penpot Screen 14
-    _restockList.add(
-      RestockItemModel(
-        id: '1',
-        name: 'velg jari-jari supra 125',
-        category: 'velg',
-        buyPrice: 90000,
-        quantity: 10,
-        unit: 'pcs',
-      ),
-    );
-    _restockList.add(
-      RestockItemModel(
-        id: '2',
-        name: 'oli mpx2',
-        category: 'oli',
-        buyPrice: 60000,
-        quantity: 20,
-        unit: 'pcs',
-      ),
-    );
+    if (_sparepartCatalog.isNotEmpty) {
+      final first = _sparepartCatalog.first;
+      _selectedSparepart = first['name'] as String;
+      _currentCategory = first['category'] as String;
+      _currentBuyPrice = first['buyPrice'] as int;
+      _currentUnit = first['unit'] as String;
+      _priceController.text = _currentBuyPrice.toString();
+    }
   }
 
   @override
   void dispose() {
     _priceController.dispose();
+    _customSupplierController.dispose();
     super.dispose();
   }
 
-  String _formatNumber(int val) {
-    final str = val.toString();
-    final buffer = StringBuffer();
-    int count = 0;
-    for (int i = str.length - 1; i >= 0; i--) {
-      buffer.write(str[i]);
-      count++;
-      if (count % 3 == 0 && i != 0) {
-        buffer.write('.');
-      }
-    }
-    return buffer.toString().split('').reversed.join('');
+  String _formatRupiah(int nominal) => formatRupiah(nominal);
+
+  String _formatDateDisplay(DateTime d) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+    ];
+    return '${d.day} ${months[d.month - 1]} ${d.year}';
   }
 
   int get _totalModal =>
@@ -191,17 +103,40 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
       _restockList.fold(0, (sum, item) => sum + item.quantity);
 
   void _onSelectSparepart(String name) {
-    final item = _sparepartCatalog.firstWhere((e) => e['name'] == name);
+    final matches = _sparepartCatalog.where((e) => e['name'] == name);
+    if (matches.isEmpty) return;
+    final item = matches.first;
     setState(() {
       _selectedSparepart = name;
       _currentCategory = item['category'] as String;
       _currentBuyPrice = item['buyPrice'] as int;
       _currentUnit = item['unit'] as String;
-      _priceController.text = _formatNumber(_currentBuyPrice);
+      _priceController.text = _currentBuyPrice.toString();
     });
   }
 
+  Future<void> _pickPurchaseDate() async {
+    final picked = await CustomCalendarDialog.show(
+      context,
+      initialDate: _selectedDate,
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
   void _addItemToRestockList() {
+    final selected = _selectedSparepart;
+    if (selected == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFF3B1517),
+          content: Text('Pilih sparepart terlebih dahulu!'),
+        ),
+      );
+      return;
+    }
+
     final priceParsed = int.tryParse(
           _priceController.text.replaceAll('.', '').trim(),
         ) ??
@@ -211,7 +146,7 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
       _restockList.add(
         RestockItemModel(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
-          name: _selectedSparepart,
+          name: selected,
           category: _currentCategory,
           buyPrice: priceParsed,
           quantity: _currentQty,
@@ -223,12 +158,12 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: const Color(0xFF143322),
-        content: Text('$_selectedSparepart ($_currentQty $_currentUnit) masuk ke daftar restock!'),
+        content: Text('$selected ($_currentQty $_currentUnit) masuk ke daftar restock!'),
       ),
     );
   }
 
-  void _handleSaveRestock() {
+  void _handleSaveRestock() async {
     if (_restockList.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -240,17 +175,33 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
     }
 
     final buyer = widget.userData?['nama_lengkap'] ?? 'Sugeng Yulianto';
+    final supplierName = _selectedSupplier == 'Lainnya (Ketik Manual)'
+        ? (_customSupplierController.text.trim().isEmpty
+            ? 'Supplier Umum'
+            : _customSupplierController.text.trim())
+        : _selectedSupplier;
+
     final newPembelian = PembelianRecord(
-      code: '#BELI-00${DateTime.now().second % 90 + 10}',
-      dateTime: DateTime.now(),
+      code: PembelianService().generateBeliCode(),
+      dateTime: _selectedDate,
       buyerName: buyer,
-      supplier: 'Toko Sumber Jaya',
+      supplier: supplierName,
       items: List.from(_restockList),
       totalAmount: _totalModal,
       status: 'LUNAS',
     );
 
-    Navigator.pop(context, newPembelian);
+    await PembelianService().savePembelian(newPembelian);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF143322),
+          content: Text('Pengadaan ${newPembelian.code} berhasil disimpan!'),
+        ),
+      );
+      Navigator.pop(context, newPembelian);
+    }
   }
 
   @override
@@ -326,28 +277,126 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
                         ),
                       ],
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: const [
-                        Text(
-                          'Tanggal Pembelian',
-                          style: TextStyle(color: textMuted, fontSize: 11),
+                    GestureDetector(
+                      onTap: _pickPurchaseDate,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: inputBg,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: cardBorder),
                         ),
-                        SizedBox(height: 4),
-                        Text(
-                          '12 Okt 2026',
-                          style: TextStyle(
-                            color: accentGreen,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Text(
+                              'Tanggal Pembelian',
+                              style: TextStyle(color: textMuted, fontSize: 10),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.calendar_today_rounded, color: accentGreen, size: 12),
+                                const SizedBox(width: 5),
+                                Text(
+                                  _formatDateDisplay(_selectedDate),
+                                  style: const TextStyle(
+                                    color: accentGreen,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
+
+              // 2b. Card Pilih Supplier / Pemasok
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: cardBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Pemasok / Toko Supplier',
+                      style: TextStyle(
+                        color: textWhite,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: inputBg,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: cardBorder),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedSupplier,
+                          isExpanded: true,
+                          dropdownColor: cardBg,
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: textDim,
+                          ),
+                          items: _supplierList.map((sup) {
+                            return DropdownMenuItem<String>(
+                              value: sup,
+                              child: Text(
+                                sup,
+                                style: const TextStyle(
+                                  color: textWhite,
+                                  fontSize: 12.5,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => _selectedSupplier = val);
+                          },
+                        ),
+                      ),
+                    ),
+                    if (_selectedSupplier == 'Lainnya (Ketik Manual)') ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: inputBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: cardBorder),
+                        ),
+                        child: TextField(
+                          controller: _customSupplierController,
+                          style: const TextStyle(color: textWhite, fontSize: 12.5),
+                          decoration: const InputDecoration(
+                            hintText: 'Masukkan nama supplier...',
+                            hintStyle: TextStyle(color: textDim, fontSize: 12),
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
 
               // 3. Card Input Barang/Item
               Container(
@@ -386,7 +435,13 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          value: _selectedSparepart,
+                          value: (_sparepartCatalog.any((i) => i['name'] == _selectedSparepart))
+                              ? _selectedSparepart
+                              : null,
+                          hint: const Text(
+                            'Pilih sparepart',
+                            style: TextStyle(color: textDim, fontSize: 12),
+                          ),
                           isExpanded: true,
                           dropdownColor: cardBg,
                           icon: const Icon(
@@ -616,7 +671,7 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
                                   border: Border.all(color: cardBorder),
                                 ),
                                 child: Text(
-                                  'Rp ${_formatNumber(_currentBuyPrice * _currentQty)}',
+                                  _formatRupiah(_currentBuyPrice * _currentQty),
                                   style: const TextStyle(
                                     color: accentGreen,
                                     fontSize: 12,
@@ -716,7 +771,7 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
-                                      '${item.quantity} ${item.unit} × Rp ${_formatNumber(item.buyPrice)} • ${item.category}',
+                                      '${item.quantity} ${item.unit} × ${_formatRupiah(item.buyPrice)} • ${item.category}',
                                       style: const TextStyle(
                                         color: textMuted,
                                         fontSize: 10.5,
@@ -727,7 +782,7 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                'Rp ${_formatNumber(item.subtotal)}',
+                                _formatRupiah(item.subtotal),
                                 style: const TextStyle(
                                   color: accentGreen,
                                   fontSize: 12,
@@ -784,7 +839,7 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Rp ${_formatNumber(_totalModal)}',
+                              _formatRupiah(_totalModal),
                               style: const TextStyle(
                                 color: textWhite,
                                 fontSize: 18,
