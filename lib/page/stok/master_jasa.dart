@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/jasa_service.dart';
-import 'data_sparepart.dart';
+import 'tambah_jasa.dart';
 
 export '../../services/jasa_service.dart' show JasaModel;
 
@@ -61,6 +61,25 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
     return services
         .where((s) => s.name.toLowerCase().contains(_searchQuery.toLowerCase()))
         .toList();
+  }
+
+  void _openTambahJasa() async {
+    final result = await Navigator.push<JasaModel>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const TambahJasaPage(),
+      ),
+    );
+
+    if (result != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF143322),
+          content:
+              Text('Layanan "${result.name}" berhasil disimpan ke Firestore!'),
+        ),
+      );
+    }
   }
 
   void _showJasaModal({JasaModel? itemToEdit}) {
@@ -466,73 +485,6 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
-
-                  // Segmented Switcher Tab (Sparepart | Jasa)
-                  Row(
-                    children: [
-                      // Tab Sparepart (Inactive)
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => DataSparepartPage(
-                                userData: widget.userData,
-                              ),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF131722),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: cardBorder),
-                          ),
-                          child: const Text(
-                            'Sparepart',
-                            style: TextStyle(
-                              color: textMuted,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-
-                      // Tab Jasa (Active Red)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 28,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: accentRed,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: accentRed.withValues(alpha: 0.35),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Text(
-                          'Jasa',
-                          style: TextStyle(
-                            color: textWhite,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: 12),
                 ],
               ),
@@ -580,7 +532,7 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 12, right: 6),
         child: GestureDetector(
-          onTap: () => _showJasaModal(),
+          onTap: _openTambahJasa,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             decoration: BoxDecoration(

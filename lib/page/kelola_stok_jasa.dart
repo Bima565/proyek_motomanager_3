@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../components/moto_bottom_nav.dart';
 import 'stok/data_sparepart.dart';
 import 'stok/master_jasa.dart';
+import 'stok/tambah_jasa.dart';
 import 'stok/tambah_sparepart.dart';
 
 /// Screen 11 - (FR05, FR06) Navigasi Tambah Data Stok & Jasa
@@ -27,7 +28,6 @@ class _KelolaStokJasaPageState extends State<KelolaStokJasaPage> {
   static const Color accentBlue = Color(0xFF38BDF8);
   static const Color textWhite = Color(0xFFFFFFFF);
   static const Color textMuted = Color(0xFF94A3B8);
-  static const Color textDim = Color(0xFF6B7280);
 
   @override
   Widget build(BuildContext context) {
@@ -50,21 +50,9 @@ class _KelolaStokJasaPageState extends State<KelolaStokJasaPage> {
                   letterSpacing: -0.3,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // 2. Subheader Kategori Input
-              const Text(
-                'PILIH KATEGORI INPUT',
-                style: TextStyle(
-                  color: textDim,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              // 3. Card 1: Tambah Sparepart & Stok (FR05)
+              // 2. Card 1: Tambah Sparepart & Stok (FR05)
               _buildCategoryCard(
                 title: 'Tambah Sparepart & Stok',
                 description:
@@ -76,13 +64,37 @@ class _KelolaStokJasaPageState extends State<KelolaStokJasaPage> {
                 buttonLabel: 'Buka Data Stok ›',
                 buttonBg: const Color(0xFF0F1E33),
                 buttonTextColor: const Color(0xFF60A5FA),
-                onCardTap: () {
-                  Navigator.push(
+                onCardTap: () async {
+                  final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => const TambahSparepartPage(),
                     ),
                   );
+                  if (result != null && mounted) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: const Color(0xFF143322),
+                        content: Row(
+                          children: [
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              color: Color(0xFF22C55E),
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Sparepart "${result.name}" berhasil ditambahkan ke database!',
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
                 },
                 onButtonTap: () {
                   Navigator.push(
@@ -108,14 +120,37 @@ class _KelolaStokJasaPageState extends State<KelolaStokJasaPage> {
                 buttonLabel: 'Buka Master Jasa ›',
                 buttonBg: const Color(0xFF281116),
                 buttonTextColor: const Color(0xFFF87171),
-                onCardTap: () {
-                  Navigator.push(
+                onCardTap: () async {
+                  final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>
-                          MasterJasaPage(userData: widget.userData),
+                      builder: (context) => const TambahJasaPage(),
                     ),
                   );
+                  if (result != null && mounted) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: const Color(0xFF143322),
+                        content: Row(
+                          children: [
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              color: Color(0xFF22C55E),
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Layanan "${result.name}" berhasil ditambahkan ke database!',
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
                 },
                 onButtonTap: () {
                   Navigator.push(

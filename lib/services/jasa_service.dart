@@ -6,12 +6,14 @@ class JasaModel {
   String name;
   int price;
   String lastEdited;
+  String? category;
 
   JasaModel({
     required this.id,
     required this.name,
     required this.price,
     required this.lastEdited,
+    this.category,
   });
 
   Map<String, dynamic> toMap() {
@@ -19,6 +21,7 @@ class JasaModel {
       'name': name,
       'price': price,
       'lastEdited': lastEdited,
+      if (category != null) 'category': category,
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }
@@ -30,6 +33,7 @@ class JasaModel {
       name: data['name']?.toString() ?? '',
       price: (data['price'] as num?)?.toInt() ?? 0,
       lastEdited: data['lastEdited']?.toString() ?? 'Baru saja',
+      category: data['category']?.toString(),
     );
   }
 }
@@ -70,8 +74,13 @@ class JasaService {
 
   Future<void> saveJasa(JasaModel item) async {
     final list = List<JasaModel>.from(servicesNotifier.value);
-    final idx = list.indexWhere((j) => j.id == item.id || j.name.toLowerCase() == item.name.toLowerCase());
+    final idx = list.indexWhere(
+      (j) =>
+          j.id == item.id ||
+          j.name.trim().toLowerCase() == item.name.trim().toLowerCase(),
+    );
     if (idx >= 0) {
+      item.id = list[idx].id;
       list[idx] = item;
     } else {
       list.insert(0, item);
@@ -80,9 +89,13 @@ class JasaService {
 
     try {
       if (item.id.isNotEmpty && !item.id.startsWith('temp_')) {
-        await _firestore.collection('jasa_servis').doc(item.id).set(item.toMap(), SetOptions(merge: true));
+        await _firestore
+            .collection('jasa_servis')
+            .doc(item.id)
+            .set(item.toMap(), SetOptions(merge: true));
       } else {
-        final ref = await _firestore.collection('jasa_servis').add(item.toMap());
+        final ref =
+            await _firestore.collection('jasa_servis').add(item.toMap());
         item.id = ref.id;
       }
     } catch (e) {

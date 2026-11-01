@@ -39,15 +39,6 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = 'Semua';
 
-  final List<String> _categories = [
-    'Semua',
-    'Oli & Pelumas',
-    'Pengereman',
-    'Kelistrikan',
-    'Ban & Roda',
-    'Transmisi CVT',
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -84,9 +75,24 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
     return ValueListenableBuilder<List<SparepartModel>>(
       valueListenable: SparepartService().sparepartsNotifier,
       builder: (context, spareparts, _) {
+        // Ambil kategori unik HANYA dari sparepart yang sudah ditambahkan
+        final activeCategories = <String>['Semua'];
+        for (final item in spareparts) {
+          final cat = item.category.trim();
+          if (cat.isNotEmpty &&
+              !activeCategories.any((c) => c.toLowerCase() == cat.toLowerCase())) {
+            activeCategories.add(cat);
+          }
+        }
+
+        // Sinkronisasi kategori terpilih: jika kategori yang dipilih tidak ada di sparepart, fallback ke 'Semua'
+        final effectiveCategory = activeCategories.any((c) => c.toLowerCase() == _selectedCategory.toLowerCase())
+            ? _selectedCategory
+            : 'Semua';
+
         final filtered = spareparts.where((item) {
-          final matchCategory = _selectedCategory == 'Semua' ||
-              item.category.toLowerCase().contains(_selectedCategory.toLowerCase());
+          final matchCategory = effectiveCategory == 'Semua' ||
+              item.category.trim().toLowerCase() == effectiveCategory.toLowerCase();
           final matchQuery = _searchController.text.isEmpty ||
               item.name.toLowerCase().contains(_searchController.text.toLowerCase()) ||
               item.category.toLowerCase().contains(_searchController.text.toLowerCase());
@@ -107,8 +113,8 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
                 // 2. Search Bar
                 _buildSearchBar(),
 
-                // 3. Filter Kategori Chips
-                _buildCategoryFilter(),
+                // 3. Filter Kategori Chips (Hanya menampilkan kategori dari sparepart yang sudah ditambahkan)
+                _buildCategoryFilter(activeCategories, effectiveCategory),
 
                 // 4. Daftar Sparepart Cards
                 Expanded(
@@ -221,18 +227,18 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
     );
   }
 
-  Widget _buildCategoryFilter() {
+  Widget _buildCategoryFilter(List<String> categories, String currentCategory) {
     return Container(
       height: 42,
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         scrollDirection: Axis.horizontal,
-        itemCount: _categories.length,
+        itemCount: categories.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
-          final cat = _categories[index];
-          final isSelected = cat == _selectedCategory;
+          final cat = categories[index];
+          final isSelected = cat.toLowerCase() == currentCategory.toLowerCase();
 
           return GestureDetector(
             onTap: () => setState(() => _selectedCategory = cat),
@@ -431,6 +437,19 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
     final stockCtrl = TextEditingController(text: item.stock.toString());
     String selectedCat = item.category;
 
+    final spareparts = SparepartService().sparepartsNotifier.value;
+    final availableCats = <String>{
+      if (item.category.trim().isNotEmpty) item.category.trim(),
+      ...spareparts.map((s) => s.category.trim()).where((c) => c.isNotEmpty),
+      ...SparepartService().categoriesNotifier.value,
+    }.toList();
+    if (availableCats.isEmpty) {
+      availableCats.add('Lainnya');
+    }
+    if (!availableCats.contains(selectedCat)) {
+      selectedCat = availableCats.first;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -543,12 +562,12 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
                             border: Border.all(color: cardBorder),
                           ),
                           child: DropdownButton<String>(
-                            value: _categories.skip(1).contains(selectedCat) ? selectedCat : _categories[1],
+                            value: availableCats.contains(selectedCat) ? selectedCat : availableCats.first,
                             isExpanded: true,
                             underline: const SizedBox(),
                             dropdownColor: cardBg,
                             style: const TextStyle(color: textWhite, fontSize: 12),
-                            items: _categories.skip(1).map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                            items: availableCats.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                             onChanged: (val) {
                               if (val != null) setModalState(() => selectedCat = val);
                             },

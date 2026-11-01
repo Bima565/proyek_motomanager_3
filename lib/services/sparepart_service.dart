@@ -68,6 +68,18 @@ class SparepartService {
 
   List<SparepartModel> get spareparts => sparepartsNotifier.value;
 
+  // Riwayat Kategori Sparepart (Dibatasi 5 riwayat terbaru)
+  final ValueNotifier<List<String>> categoriesNotifier =
+      ValueNotifier<List<String>>([
+    'Oli & Pelumas',
+    'Pengereman',
+    'Kelistrikan',
+    'Ban & Roda',
+    'Transmisi CVT',
+  ]);
+
+  List<String> get categories => categoriesNotifier.value;
+
   void _listenFirestore() {
     try {
       _firestore.collection('spareparts').snapshots().listen(
@@ -77,13 +89,91 @@ class SparepartService {
               .toList();
 
           sparepartsNotifier.value = list;
+          _populateCategoriesFromSpareparts(list);
         },
         onError: (err) {
           debugPrint('Firestore spareparts stream error: $err');
         },
       );
+
+      // Listen riwayat kategori yang tersimpan di Firestore settings
+      _firestore
+          .collection('settings')
+          .doc('kategori_sparepart')
+          .snapshots()
+          .listen(
+        (snapshot) {
+          if (snapshot.exists && snapshot.data() != null) {
+            final dataList = (snapshot.data()?['categories'] as List<dynamic>?)
+                ?.map((e) => e.toString().trim())
+                .where((e) => e.isNotEmpty)
+                .toList() ??
+                [];
+            if (dataList.isNotEmpty) {
+              categoriesNotifier.value = dataList.take(5).toList();
+            }
+          }
+        },
+        onError: (err) {
+          debugPrint('Firestore kategori_sparepart stream error: $err');
+        },
+      );
     } catch (e) {
       debugPrint('Firestore listen spareparts error: $e');
+    }
+  }
+
+  void _populateCategoriesFromSpareparts(List<SparepartModel> list) {
+    if (categoriesNotifier.value.isNotEmpty &&
+        categoriesNotifier.value.length >= 5) {
+      return;
+    }
+    final cats = <String>[];
+    for (final s in list) {
+      final c = s.category.trim();
+      if (c.isNotEmpty &&
+          !cats.any((item) => item.toLowerCase() == c.toLowerCase())) {
+        cats.add(c);
+        if (cats.length == 5) break;
+      }
+    }
+    for (final def in [
+      'Oli & Pelumas',
+      'Pengereman',
+      'Kelistrikan',
+      'Ban & Roda',
+      'Transmisi CVT',
+    ]) {
+      if (cats.length >= 5) break;
+      if (!cats.any((item) => item.toLowerCase() == def.toLowerCase())) {
+        cats.add(def);
+      }
+    }
+    categoriesNotifier.value = cats.take(5).toList();
+  }
+
+  Future<void> addCategoryHistory(String newCategory) async {
+    final trimmed = newCategory.trim();
+    if (trimmed.isEmpty) return;
+
+    List<String> current = List<String>.from(categoriesNotifier.value);
+    // Hapus jika sudah pernah ada sebelumnya agar berpindah ke paling baru (paling atas)
+    current.removeWhere((c) => c.toLowerCase() == trimmed.toLowerCase());
+    // Masukkan kategori baru di posisi teratas
+    current.insert(0, trimmed);
+    // Batasi cuman 5 riwayat saja (jika jadi 6, hapus yang terakhir / tertimbun)
+    if (current.length > 5) {
+      current = current.sublist(0, 5);
+    }
+    categoriesNotifier.value = current;
+
+    try {
+      await _firestore.collection('settings').doc('kategori_sparepart').set({
+        'categories': current,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Firestore save category history error: $e');
     }
   }
 
