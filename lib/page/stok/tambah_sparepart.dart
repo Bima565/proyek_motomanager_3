@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../components/back_button_circle.dart';
+import '../../components/rupiah_formatter.dart';
 import '../../services/sparepart_service.dart';
 
 class TambahSparepartPage extends StatefulWidget {
@@ -339,13 +340,16 @@ class _TambahSparepartPageState extends State<TambahSparepartPage> {
                       TextFormField(
                         controller: _buyPriceController,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          RibuanTextInputFormatter(),
+                        ],
                         style: const TextStyle(
                           color: accentGreen,
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                         ),
                         decoration:
-                            _buildInputDecoration('Rp 0', prefix: 'Rp '),
+                            _buildInputDecoration('0', prefix: 'Rp '),
                       ),
                       const SizedBox(height: 18),
 
@@ -362,13 +366,16 @@ class _TambahSparepartPageState extends State<TambahSparepartPage> {
                       TextFormField(
                         controller: _sellPriceController,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          RibuanTextInputFormatter(),
+                        ],
                         style: const TextStyle(
                           color: accentGreen,
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                         ),
                         decoration:
-                            _buildInputDecoration('Rp 0', prefix: 'Rp '),
+                            _buildInputDecoration('0', prefix: 'Rp '),
                       ),
                     ],
                   ),

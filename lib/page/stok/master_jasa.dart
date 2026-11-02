@@ -421,25 +421,6 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
               ),
               const SizedBox(height: 10),
 
-              if (isEdit) ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 40,
-                  child: TextButton.icon(
-                    style: TextButton.styleFrom(
-                      foregroundColor: accentRed,
-                    ),
-                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                    label: const Text('Hapus Layanan Jasa', style: TextStyle(fontWeight: FontWeight.w600)),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _confirmDeleteJasa(itemToEdit);
-                    },
-                  ),
-                ),
-                const SizedBox(height: 6),
-              ],
-
               // Tombol Batal
               SizedBox(
                 width: double.infinity,

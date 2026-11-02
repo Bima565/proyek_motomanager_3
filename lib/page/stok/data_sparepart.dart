@@ -536,8 +536,8 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
 
   void _showEditSparepartModal(SparepartModel item) {
     final nameCtrl = TextEditingController(text: item.name);
-    final buyPriceCtrl = TextEditingController(text: item.buyPrice.toString());
-    final sellPriceCtrl = TextEditingController(text: item.sellPrice.toString());
+    final buyPriceCtrl = TextEditingController(text: formatRibuan(item.buyPrice));
+    final sellPriceCtrl = TextEditingController(text: formatRibuan(item.sellPrice));
     final stockCtrl = TextEditingController(text: item.stock.toString());
     String selectedCat = item.category;
 
@@ -609,6 +609,9 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
                         TextField(
                           controller: buyPriceCtrl,
                           keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            RibuanTextInputFormatter(),
+                          ],
                           style: const TextStyle(color: accentGreen, fontSize: 13, fontWeight: FontWeight.bold),
                           decoration: _buildInputDeco('0', prefix: 'Rp '),
                         ),
@@ -625,6 +628,9 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
                         TextField(
                           controller: sellPriceCtrl,
                           keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            RibuanTextInputFormatter(),
+                          ],
                           style: const TextStyle(color: accentGreen, fontSize: 13, fontWeight: FontWeight.bold),
                           decoration: _buildInputDeco('0', prefix: 'Rp '),
                         ),
