@@ -52,6 +52,71 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
 
   String _formatRupiah(int nominal) => formatRupiah(nominal);
 
+  void _confirmDeleteSparepart(SparepartModel item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: cardBorder),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: accentRed, size: 22),
+            SizedBox(width: 8),
+            Text(
+              'Hapus Sparepart',
+              style: TextStyle(
+                color: textWhite,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus sparepart "${item.name}"? Data yang dihapus tidak dapat dikembalikan.',
+          style: const TextStyle(color: textMuted, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal', style: TextStyle(color: textDim)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentRed,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await SparepartService().deleteSparepart(item.id);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: const Color(0xFF3B1517),
+                    content: Text('Sparepart "${item.name}" berhasil dihapus'),
+                  ),
+                );
+              }
+            },
+            child: const Text(
+              'Hapus',
+              style: TextStyle(
+                color: textWhite,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openTambahSparepart() async {
     final result = await Navigator.push<SparepartModel>(
       context,
@@ -213,14 +278,34 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
         ),
         child: TextField(
           controller: _searchController,
+          textAlignVertical: TextAlignVertical.center,
           onChanged: (_) => setState(() {}),
           style: const TextStyle(color: textWhite, fontSize: 13),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
+            isDense: true,
             hintText: 'Cari nama sparepart atau kode...',
-            hintStyle: TextStyle(color: textDim, fontSize: 12),
-            prefixIcon: Icon(Icons.search_rounded, color: textDim, size: 20),
+            hintStyle: const TextStyle(color: textDim, fontSize: 12),
+            prefixIcon: const Icon(Icons.search_rounded, color: textDim, size: 18),
+            prefixIconConstraints: const BoxConstraints(minWidth: 42, minHeight: 44),
+            suffixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 44),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      _searchController.clear();
+                      setState(() {});
+                    },
+                    child: const Center(
+                      child: Icon(
+                        Icons.close_rounded,
+                        color: textDim,
+                        size: 16,
+                      ),
+                    ),
+                  )
+                : null,
             border: InputBorder.none,
-            contentPadding: EdgeInsets.symmetric(vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
           ),
         ),
       ),
@@ -374,7 +459,7 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
           ),
           const SizedBox(width: 8),
 
-          // 3. Badge Stok & Tombol Kebab Action Sesuai Penpot Screen 5
+          // 3. Badge Stok & Tombol Aksi (Ubah & Hapus)
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -400,25 +485,44 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
               ),
               const SizedBox(width: 8),
 
-              // Tombol Kebab Action [ ⋮ ]
+              // Tombol Ubah (Ikon Pensil)
               GestureDetector(
-                onTap: () => _showItemActions(item),
+                onTap: () => _showEditSparepartModal(item),
                 child: Container(
-                  width: 22,
-                  height: 22,
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E2333),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: const Color(0xFF2D3548),
-                      width: 0.8,
-                    ),
+                    color: const Color(0xFF1E2332),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF293042)),
                   ),
                   child: const Center(
                     child: Icon(
-                      Icons.more_vert_rounded,
-                      color: Color(0xFF94A3B8),
-                      size: 14,
+                      Icons.edit_rounded,
+                      color: textWhite,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+
+              // Tombol Hapus (Ikon Tong Sampah)
+              GestureDetector(
+                onTap: () => _confirmDeleteSparepart(item),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2B191E),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF5A1E24)),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.delete_outline_rounded,
+                      color: accentRed,
+                      size: 16,
                     ),
                   ),
                 ),
@@ -640,69 +744,6 @@ class _DataSparepartPageState extends State<DataSparepartPage> {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: cardBorder)),
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: cardBorder)),
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: accentRed)),
-    );
-  }
-
-  void _showItemActions(SparepartModel item) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        side: BorderSide(color: cardBorder),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: textDim.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              item.name,
-              style: const TextStyle(
-                color: textWhite,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.edit_rounded, color: Color(0xFF60A5FA)),
-              title: const Text('Edit Sparepart', style: TextStyle(color: textWhite, fontSize: 13.5)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showEditSparepartModal(item);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline_rounded, color: accentRed),
-              title: const Text('Hapus Sparepart',
-                  style: TextStyle(color: accentRed, fontSize: 13.5, fontWeight: FontWeight.w600)),
-              onTap: () async {
-                Navigator.pop(ctx);
-                await SparepartService().deleteSparepart(item.id);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: const Color(0xFF3B1517),
-                      content: Text('${item.name} berhasil dihapus dari Firestore'),
-                    ),
-                  );
-                }
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
     );
   }
 

@@ -57,10 +57,76 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
   }
 
   List<JasaModel> _getFilteredServices(List<JasaModel> services) {
-    if (_searchQuery.isEmpty) return services;
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return services;
     return services
-        .where((s) => s.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+        .where((s) => s.name.toLowerCase().contains(query))
         .toList();
+  }
+
+  void _confirmDeleteJasa(JasaModel item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: cardBorder),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: accentRed, size: 22),
+            SizedBox(width: 8),
+            Text(
+              'Hapus Layanan Jasa',
+              style: TextStyle(
+                color: textWhite,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus layanan "${item.name}"? Data yang dihapus tidak dapat dikembalikan.',
+          style: const TextStyle(color: textMuted, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal', style: TextStyle(color: textDim)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentRed,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await JasaService().deleteJasa(item.id);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: const Color(0xFF3B1517),
+                    content: Text('Layanan "${item.name}" berhasil dihapus'),
+                  ),
+                );
+              }
+            },
+            child: const Text(
+              'Hapus',
+              style: TextStyle(
+                color: textWhite,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _openTambahJasa() async {
@@ -252,6 +318,19 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
                       child: TextField(
                         controller: priceController,
                         keyboardType: TextInputType.number,
+                        textAlignVertical: TextAlignVertical.center,
+                        onChanged: (val) {
+                          final digits = val.replaceAll(RegExp(r'[^0-9]'), '');
+                          if (digits.isEmpty) {
+                            priceController.value = TextEditingValue.empty;
+                            return;
+                          }
+                          final formatted = _formatRupiah(int.tryParse(digits) ?? 0);
+                          priceController.value = TextEditingValue(
+                            text: formatted,
+                            selection: TextSelection.collapsed(offset: formatted.length),
+                          );
+                        },
                         style: const TextStyle(
                           color: accentGreen,
                           fontSize: 14,
@@ -284,29 +363,50 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
                   ),
                   onPressed: () async {
                     final name = nameController.text.trim();
-                    final priceRaw = priceController.text.replaceAll('.', '').trim();
+                    final priceRaw = priceController.text
+                        .replaceAll('.', '')
+                        .replaceAll(RegExp(r'[^0-9]'), '')
+                        .trim();
                     final price = int.tryParse(priceRaw) ?? 0;
 
-                    if (name.isNotEmpty && price > 0) {
-                      final now = DateTime.now();
-                      final timeStr =
-                          'Diedit ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} ${now.day}/${now.month}/${now.year}';
-                      final item = JasaModel(
-                        id: isEdit ? itemToEdit.id : 'js-${DateTime.now().millisecondsSinceEpoch}',
-                        name: name,
-                        price: price,
-                        lastEdited: timeStr,
+                    if (name.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          backgroundColor: Color(0xFF3B1517),
+                          content: Text('Nama layanan servis wajib diisi!'),
+                        ),
                       );
-                      Navigator.pop(ctx);
-                      await JasaService().saveJasa(item);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            backgroundColor: const Color(0xFF143322),
-                            content: Text('Layanan "$name" berhasil disimpan ke Firestore!'),
-                          ),
-                        );
-                      }
+                      return;
+                    }
+
+                    if (price <= 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          backgroundColor: Color(0xFF3B1517),
+                          content: Text('Tarif jasa harus lebih dari 0!'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final now = DateTime.now();
+                    final timeStr =
+                        'Diedit ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} ${now.day}/${now.month}/${now.year}';
+                    final item = JasaModel(
+                      id: isEdit ? itemToEdit.id : 'js-${DateTime.now().millisecondsSinceEpoch}',
+                      name: name,
+                      price: price,
+                      lastEdited: timeStr,
+                    );
+                    Navigator.pop(ctx);
+                    await JasaService().saveJasa(item);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          backgroundColor: const Color(0xFF143322),
+                          content: Text('Layanan "$name" berhasil disimpan ke Firestore!'),
+                        ),
+                      );
                     }
                   },
                   child: Text(
@@ -331,17 +431,9 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
                     ),
                     icon: const Icon(Icons.delete_outline_rounded, size: 18),
                     label: const Text('Hapus Layanan Jasa', style: TextStyle(fontWeight: FontWeight.w600)),
-                    onPressed: () async {
+                    onPressed: () {
                       Navigator.pop(ctx);
-                      await JasaService().deleteJasa(itemToEdit.id);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            backgroundColor: const Color(0xFF3B1517),
-                            content: Text('Layanan "${itemToEdit.name}" berhasil dihapus dari Firestore'),
-                          ),
-                        );
-                      }
+                      _confirmDeleteJasa(itemToEdit);
                     },
                   ),
                 ),
@@ -454,9 +546,11 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
                     ),
                     child: TextField(
                       controller: _searchController,
+                      textAlignVertical: TextAlignVertical.center,
                       style: const TextStyle(color: textWhite, fontSize: 13),
-                      onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                      onChanged: (val) => setState(() => _searchQuery = val),
                       decoration: InputDecoration(
+                        isDense: true,
                         hintText: 'Cari jenis layanan jasa...',
                         hintStyle: const TextStyle(color: textDim, fontSize: 12),
                         prefixIcon: const Icon(
@@ -464,22 +558,33 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
                           color: textDim,
                           size: 18,
                         ),
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 42,
+                          minHeight: 44,
+                        ),
+                        suffixIconConstraints: const BoxConstraints(
+                          minWidth: 40,
+                          minHeight: 44,
+                        ),
                         suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(
-                                  Icons.close_rounded,
-                                  color: textDim,
-                                  size: 16,
-                                ),
-                                onPressed: () {
+                            ? GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () {
                                   _searchController.clear();
                                   setState(() => _searchQuery = '');
                                 },
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.close_rounded,
+                                    color: textDim,
+                                    size: 16,
+                                  ),
+                                ),
                               )
                             : null,
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
+                          horizontal: 4,
                           vertical: 12,
                         ),
                       ),
@@ -644,25 +749,53 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
           ),
           const SizedBox(width: 8),
 
-          // Tombol Ubah (Pill Abu Gelap)
-          GestureDetector(
-            onTap: () => _showJasaModal(itemToEdit: item),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E2332),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF293042)),
-              ),
-              child: const Text(
-                'Ubah',
-                style: TextStyle(
-                  color: textWhite,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
+          // Tombol Aksi: Ubah (Ikon Pensil) & Hapus (Ikon Tong Sampah)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Tombol Ubah (Ikon Pensil)
+              GestureDetector(
+                onTap: () => _showJasaModal(itemToEdit: item),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E2332),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF293042)),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.edit_rounded,
+                      color: textWhite,
+                      size: 16,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 8),
+
+              // Tombol Hapus (Ikon Tong Sampah)
+              GestureDetector(
+                onTap: () => _confirmDeleteJasa(item),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2B191E),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF5A1E24)),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.delete_outline_rounded,
+                      color: accentRed,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
