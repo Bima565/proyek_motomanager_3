@@ -214,16 +214,24 @@ class TransaksiService {
     return 'TRX-$y$m$d-$seq';
   }
 
-  /// Simpan transaksi penjualan baru
+  /// Simpan transaksi penjualan (baik 'Lunas' maupun 'Belum Selesai')
   Future<TransaksiPenjualanModel> saveTransaksi(TransaksiPenjualanModel trx) async {
-    // 1. Simpan ke reactive memory state langsung (instan)
-    final updatedList = [trx, ...transactionsNotifier.value];
-    transactionsNotifier.value = updatedList;
+    // 1. Simpan atau perbarui di reactive memory state
+    final list = List<TransaksiPenjualanModel>.from(transactionsNotifier.value);
+    final idx = list.indexWhere((t) => t.code == trx.code);
+    if (idx >= 0) {
+      list[idx] = trx;
+    } else {
+      list.insert(0, trx);
+    }
+    transactionsNotifier.value = list;
 
-    // 2. Potong stok sparepart yang terjual
-    for (final item in trx.items) {
-      if (!item.isService) {
-        SparepartService().adjustStock(item.name, -item.quantity);
+    // 2. Potong stok barang yang terjual jika statusnya 'Lunas'
+    if (trx.status.toUpperCase() == 'LUNAS') {
+      for (final item in trx.items) {
+        if (!item.isService) {
+          SparepartService().adjustStock(item.name, -item.quantity);
+        }
       }
     }
 
@@ -232,7 +240,7 @@ class TransaksiService {
       await _firestore
           .collection('transaksi_penjualan')
           .doc(trx.code)
-          .set(trx.toMap());
+          .set(trx.toMap(), SetOptions(merge: true));
       return trx;
     } catch (e) {
       debugPrint('Firestore saveTransaksi failed (local saved): $e');

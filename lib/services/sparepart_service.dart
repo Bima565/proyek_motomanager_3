@@ -210,6 +210,61 @@ class SparepartService {
     }
   }
 
+  /// Tambah atau sesuaikan stok barang (otomatis buat master data barang baru jika belum ada)
+  Future<void> addOrAdjustStock({
+    required String name,
+    required String category,
+    required int buyPrice,
+    int? sellPrice,
+    required int quantity,
+    String unit = 'Pcs',
+  }) async {
+    final list = List<SparepartModel>.from(sparepartsNotifier.value);
+    final idx = list.indexWhere((s) => s.name.trim().toLowerCase() == name.trim().toLowerCase());
+    if (idx >= 0) {
+      final s = list[idx];
+      final newStock = (s.stock + quantity).clamp(0, 99999);
+      s.stock = newStock;
+      s.buyPrice = buyPrice;
+      if (sellPrice != null && sellPrice > 0) {
+        s.sellPrice = sellPrice;
+      }
+      s.lastUpdated = 'Restock ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}';
+      sparepartsNotifier.value = list;
+
+      try {
+        final updateData = <String, dynamic>{
+          'stock': newStock,
+          'buyPrice': buyPrice,
+          'lastUpdated': s.lastUpdated,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+        if (sellPrice != null && sellPrice > 0) {
+          updateData['sellPrice'] = sellPrice;
+        }
+        await _firestore.collection('spareparts').doc(s.id).update(updateData);
+      } catch (e) {
+        debugPrint('Firestore addOrAdjustStock update error: $e');
+      }
+    } else {
+      // Buat master barang baru otomatis
+      final computedSellPrice = (sellPrice != null && sellPrice > 0)
+          ? sellPrice
+          : (buyPrice * 1.25).round();
+      final newPart = SparepartModel(
+        id: '',
+        name: name.trim(),
+        category: category.trim().isNotEmpty ? category.trim() : 'Lainnya',
+        buyPrice: buyPrice,
+        sellPrice: computedSellPrice,
+        stock: quantity,
+        unit: unit.trim().isNotEmpty ? unit.trim() : 'Pcs',
+        lastUpdated: 'Restock Baru',
+      );
+      await saveSparepart(newPart);
+    }
+  }
+
   Future<void> adjustStock(String name, int delta) async {
     final list = List<SparepartModel>.from(sparepartsNotifier.value);
     final idx = list.indexWhere((s) => s.name.toLowerCase() == name.toLowerCase());

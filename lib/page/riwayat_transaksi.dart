@@ -816,18 +816,33 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
       itemBuilder: (context, index) {
         final trx = list[index];
         final isQris = trx.paymentMethod.toUpperCase() == 'QRIS';
+        final isBelumSelesai = trx.status.toLowerCase().contains('belum');
 
         return InkWell(
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => NotaPembayaranPage(
-                  transaksi: trx,
-                  userData: widget.userData,
+            if (isBelumSelesai) {
+              // Jika Belum Selesai, buka kembali KasirTransaksiPage untuk melanjutkan transaksi
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => KasirTransaksiPage(
+                    userData: widget.userData,
+                    initialTransaksi: trx,
+                  ),
                 ),
-              ),
-            );
+              );
+            } else {
+              // Jika sudah Lunas, hanya tampilkan Nota Pembayaran (tidak bisa diedit lagi)
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => NotaPembayaranPage(
+                    transaksi: trx,
+                    userData: widget.userData,
+                  ),
+                ),
+              );
+            }
           },
           borderRadius: BorderRadius.circular(16),
           child: Container(
@@ -835,7 +850,10 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
             decoration: BoxDecoration(
               color: cardBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: cardBorder, width: 1),
+              border: Border.all(
+                color: isBelumSelesai ? const Color(0xFF78350F) : cardBorder,
+                width: 1,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -851,20 +869,45 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
                       ),
                     ),
                     const SizedBox(width: 8),
+                    // Badge Status (Belum Selesai vs Lunas)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: isQris ? const Color(0xFF0C243B) : const Color(0xFF0F2E1E),
+                        color: isBelumSelesai
+                            ? const Color(0xFF2E1C14)
+                            : const Color(0xFF0F2E1E),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color: isQris ? const Color(0xFF1E40AF) : const Color(0xFF166534),
+                          color: isBelumSelesai
+                              ? const Color(0xFFB45309)
+                              : const Color(0xFF166534),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        trx.status,
+                        style: TextStyle(
+                          color: isBelumSelesai ? const Color(0xFFF59E0B) : accentGreen,
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isQris ? const Color(0xFF0C243B) : const Color(0xFF161E2E),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isQris ? const Color(0xFF1E40AF) : cardBorder,
                           width: 1,
                         ),
                       ),
                       child: Text(
                         trx.paymentMethod,
                         style: TextStyle(
-                          color: isQris ? accentBlue : accentGreen,
+                          color: isQris ? accentBlue : textMuted,
                           fontSize: 8.5,
                           fontWeight: FontWeight.w700,
                         ),
@@ -902,7 +945,14 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Text('›', style: TextStyle(color: textMuted, fontSize: 16)),
+                    Text(
+                      isBelumSelesai ? 'Lanjutkan ›' : '›',
+                      style: TextStyle(
+                        color: isBelumSelesai ? const Color(0xFFF59E0B) : textMuted,
+                        fontSize: isBelumSelesai ? 11 : 16,
+                        fontWeight: isBelumSelesai ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
                   ],
                 ),
               ],

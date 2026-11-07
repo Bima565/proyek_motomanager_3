@@ -7,6 +7,7 @@ class RestockItemModel {
   String name;
   String category;
   int buyPrice;
+  int sellPrice;
   int quantity;
   String unit;
 
@@ -15,9 +16,10 @@ class RestockItemModel {
     required this.name,
     required this.category,
     required this.buyPrice,
+    int? sellPrice,
     required this.quantity,
     this.unit = 'pcs',
-  });
+  }) : sellPrice = sellPrice ?? (buyPrice * 1.25).round();
 
   int get subtotal => buyPrice * quantity;
 
@@ -27,17 +29,20 @@ class RestockItemModel {
       'name': name,
       'category': category,
       'buyPrice': buyPrice,
+      'sellPrice': sellPrice,
       'quantity': quantity,
       'unit': unit,
     };
   }
 
   factory RestockItemModel.fromMap(Map<String, dynamic> map) {
+    final buy = (map['buyPrice'] as num?)?.toInt() ?? 0;
     return RestockItemModel(
       id: map['id']?.toString() ?? '',
       name: map['name']?.toString() ?? '',
       category: map['category']?.toString() ?? '',
-      buyPrice: (map['buyPrice'] as num?)?.toInt() ?? 0,
+      buyPrice: buy,
+      sellPrice: (map['sellPrice'] as num?)?.toInt() ?? (buy * 1.25).round(),
       quantity: (map['quantity'] as num?)?.toInt() ?? 1,
       unit: map['unit']?.toString() ?? 'pcs',
     );
@@ -182,9 +187,16 @@ class PembelianService {
     final updatedList = [pembelian, ...pembelianNotifier.value];
     pembelianNotifier.value = updatedList;
 
-    // 2. Tambah stok sparepart yang direstock
+    // 2. Tambah stok barang yang direstock (atau buat barang baru jika belum ada di data stok)
     for (final item in pembelian.items) {
-      SparepartService().adjustStock(item.name, item.quantity);
+      SparepartService().addOrAdjustStock(
+        name: item.name,
+        category: item.category,
+        buyPrice: item.buyPrice,
+        sellPrice: item.sellPrice > 0 ? item.sellPrice : null,
+        quantity: item.quantity,
+        unit: item.unit,
+      );
     }
 
     // 3. Simpan secara asinkron ke Firestore
