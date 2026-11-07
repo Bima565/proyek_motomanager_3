@@ -48,12 +48,9 @@ class NotaPembayaranPage extends StatelessWidget {
       transaksi?.notaTimeFormatted ?? waktu ?? '29/09/2026 • 10:45 WIB';
   String get effectivePelanggan {
     if (transaksi != null) {
-      final plat = transaksi!.policeNumber.isNotEmpty
-          ? ' (${transaksi!.policeNumber})'
-          : '';
-      return '${transaksi!.customerName}$plat';
+      return transaksi!.customerName.isNotEmpty ? transaksi!.customerName : 'Pelanggan Umum';
     }
-    return pelanggan ?? 'Bpk. Rahmat Santoso (B 4921 KDF)';
+    return pelanggan ?? 'Pelanggan Umum';
   }
 
   String get effectiveKasir =>
@@ -109,10 +106,6 @@ class NotaPembayaranPage extends StatelessWidget {
     buffer.writeln('----------------------------------------');
     buffer.writeln('*TOTAL PEMBAYARAN: ${_formatRupiah(effectiveTotalBayar)}*');
     buffer.writeln('Metode   : $effectivePaymentMethod');
-    if (effectivePaymentMethod == 'Tunai') {
-      buffer.writeln('Tunai    : ${_formatRupiah(effectiveTunaiDiterima)}');
-      buffer.writeln('Kembalian: ${_formatRupiah(effectiveKembalian)}');
-    }
     buffer.writeln('Status   : LUNAS');
     buffer.writeln('----------------------------------------');
     buffer.writeln('Terima kasih telah mempercayakan perawatan motor Anda kepada Bengkel Zalzabila Motor!');
@@ -311,22 +304,6 @@ class NotaPembayaranPage extends StatelessWidget {
                             style: const TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
-                    if (effectivePaymentMethod == 'Tunai') ...[
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('BAYAR TUNAI:'),
-                          Text(_formatRupiah(effectiveTunaiDiterima)),
-                        ],
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('KEMBALIAN:'),
-                          Text(_formatRupiah(effectiveKembalian)),
-                        ],
-                      ),
-                    ],
                     const Text('================================='),
                     const Text('TERIMA KASIH'),
                     const Text('GARANSI SERVIS 7 HARI'),

@@ -70,16 +70,16 @@ class TransaksiPenjualanModel {
     required this.dateTime,
     required this.customerName,
     required this.vehicleInfo,
-    required this.policeNumber,
+    this.policeNumber = '',
     this.customerPhone = '',
     required this.kasirName,
     required this.items,
     required this.totalBayar,
     required this.paymentMethod,
-    required this.tunaiDiterima,
-    required this.kembalian,
+    int? tunaiDiterima,
+    this.kembalian = 0,
     this.status = 'Lunas',
-  });
+  }) : tunaiDiterima = tunaiDiterima ?? totalBayar;
 
   String get timeFormatted {
     final d = dateTime.day.toString().padLeft(2, '0');
@@ -118,14 +118,11 @@ class TransaksiPenjualanModel {
       'timestamp': Timestamp.fromDate(dateTime),
       'customerName': customerName,
       'vehicleInfo': vehicleInfo,
-      'policeNumber': policeNumber,
       'customerPhone': customerPhone,
       'kasirName': kasirName,
       'items': items.map((i) => i.toMap()).toList(),
       'totalBayar': totalBayar,
       'paymentMethod': paymentMethod,
-      'tunaiDiterima': tunaiDiterima,
-      'kembalian': kembalian,
       'status': status,
     };
   }
@@ -146,20 +143,21 @@ class TransaksiPenjualanModel {
     final items = rawItems
         .map((i) => TransaksiItemModel.fromMap(Map<String, dynamic>.from(i as Map)))
         .toList();
+    final total = (data['totalBayar'] as num?)?.toInt() ?? 0;
 
     return TransaksiPenjualanModel(
       id: doc.id,
       code: data['code']?.toString() ?? doc.id,
       dateTime: dt,
-      customerName: data['customerName']?.toString() ?? 'Pelanggan Umum',
+      customerName: data['customerName']?.toString() ?? '',
       vehicleInfo: data['vehicleInfo']?.toString() ?? '',
       policeNumber: data['policeNumber']?.toString() ?? '',
       customerPhone: data['customerPhone']?.toString() ?? '',
       kasirName: data['kasirName']?.toString() ?? 'Kasir',
       items: items,
-      totalBayar: (data['totalBayar'] as num?)?.toInt() ?? 0,
+      totalBayar: total,
       paymentMethod: data['paymentMethod']?.toString() ?? 'Tunai',
-      tunaiDiterima: (data['tunaiDiterima'] as num?)?.toInt() ?? 0,
+      tunaiDiterima: (data['tunaiDiterima'] as num?)?.toInt() ?? total,
       kembalian: (data['kembalian'] as num?)?.toInt() ?? 0,
       status: data['status']?.toString() ?? 'Lunas',
     );
@@ -239,6 +237,52 @@ class TransaksiService {
     } catch (e) {
       debugPrint('Firestore saveTransaksi failed (local saved): $e');
       return trx;
+    }
+  }
+
+  /// Simpan draft transaksi (FR kasir draft)
+  Future<void> saveDraft({
+    required String code,
+    required String customerName,
+    required String vehicleInfo,
+    required String customerPhone,
+    required List<TransaksiItemModel> items,
+    required String paymentMethod,
+  }) async {
+    try {
+      await _firestore.collection('draft_transaksi').doc('active_draft').set({
+        'code': code,
+        'customerName': customerName,
+        'vehicleInfo': vehicleInfo,
+        'customerPhone': customerPhone,
+        'items': items.map((i) => i.toMap()).toList(),
+        'paymentMethod': paymentMethod,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Firestore saveDraft failed: $e');
+    }
+  }
+
+  /// Ambil draft transaksi yang tersimpan
+  Future<Map<String, dynamic>?> getDraft() async {
+    try {
+      final doc = await _firestore.collection('draft_transaksi').doc('active_draft').get();
+      if (doc.exists && doc.data() != null) {
+        return doc.data();
+      }
+    } catch (e) {
+      debugPrint('Firestore getDraft failed: $e');
+    }
+    return null;
+  }
+
+  /// Hapus draft transaksi setelah selesai checkout atau dibatalkan
+  Future<void> clearDraft() async {
+    try {
+      await _firestore.collection('draft_transaksi').doc('active_draft').delete();
+    } catch (e) {
+      debugPrint('Firestore clearDraft failed: $e');
     }
   }
 

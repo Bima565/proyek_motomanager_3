@@ -4,6 +4,8 @@ import '../../components/rupiah_formatter.dart';
 import '../../services/jasa_service.dart';
 import '../../services/sparepart_service.dart';
 import '../../services/transaksi_service.dart';
+import '../stok/tambah_jasa.dart';
+import '../stok/tambah_sparepart.dart';
 import 'nota_pembayaran.dart';
 
 // Alias backward compatibility
@@ -32,81 +34,116 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
   static const Color textMuted = Color(0xFF94A3B8);
   static const Color textDim = Color(0xFF64748B);
 
-  // Data Pelanggan & Motor
-  String _customerName = 'Pelanggan Umum';
-  String _vehicleInfo = 'Honda Vario 160';
-  String _policeNumber = 'B 4921 KDF';
-  String _customerPhone = '0812-9834-2109';
+  // 1. Data Pelanggan & Motor (Tanpa Dummy - Murni Input Manual)
+  String _customerName = '';
+  String _vehicleInfo = '';
+  String _customerPhone = '';
   late String _trxCode;
 
   // Metode Pembayaran ('Tunai' atau 'QRIS')
   String _paymentMethod = 'Tunai';
 
-  // Controller Uang Tunai Diterima
-  final TextEditingController _cashReceivedController =
-      TextEditingController();
+  // Layanan Jasa Terpilih di bar atas
+  TransaksiItemModel? _selectedServiceItem;
 
-  // Mode pemilihan katalog aktif ('Jasa Servis' atau 'Sparepart')
-  String _selectedCatalogType = 'Jasa Servis';
-  TransaksiItemModel? _selectedCatalogItem;
-
-  // Daftar Item Transaksi
+  // 1 & 7. Daftar Item Transaksi (Mulai Kosong / Tanpa Dummy)
   late List<TransaksiItemModel> _items;
+
+  // 8. Draf Transaksi Tersimpan
+  Map<String, dynamic>? _existingDraft;
 
   @override
   void initState() {
     super.initState();
     _trxCode = TransaksiService().generateTrxCode();
-    _items = [
-      TransaksiItemModel(
-        id: 'init_1',
-        name: 'Servis Rutin Ringan',
-        category: 'Jasa Servis',
-        subInfo: 'Tune-up & Injeksi',
-        price: 75000,
-        quantity: 1,
-        isService: true,
-      ),
-      TransaksiItemModel(
-        id: 'init_2',
-        name: 'Oli Mesin MPX2 Matic',
-        category: 'Sparepart',
-        subInfo: 'Oli & Pelumas',
-        price: 54000,
-        quantity: 1,
-        isService: false,
-      ),
-    ];
-    _cashReceivedController.text = '150000';
+    _items = [];
+    _checkExistingDraft();
   }
 
-  @override
-  void dispose() {
-    _cashReceivedController.dispose();
-    super.dispose();
+  Future<void> _checkExistingDraft() async {
+    final draft = await TransaksiService().getDraft();
+    if (draft != null && mounted) {
+      final rawItems = draft['items'] as List<dynamic>? ?? [];
+      final hasCustomer = (draft['customerName']?.toString().trim().isNotEmpty ?? false);
+      if (rawItems.isNotEmpty || hasCustomer) {
+        setState(() {
+          _existingDraft = draft;
+        });
+      }
+    }
   }
 
+  void _restoreDraft() {
+    if (_existingDraft == null) return;
+    setState(() {
+      _trxCode = _existingDraft!['code']?.toString() ?? _trxCode;
+      _customerName = _existingDraft!['customerName']?.toString() ?? '';
+      _vehicleInfo = _existingDraft!['vehicleInfo']?.toString() ?? '';
+      _customerPhone = _existingDraft!['customerPhone']?.toString() ?? '';
+      _paymentMethod = _existingDraft!['paymentMethod']?.toString() ?? 'Tunai';
+
+      final rawItems = _existingDraft!['items'] as List<dynamic>? ?? [];
+      _items = rawItems
+          .map((i) => TransaksiItemModel.fromMap(Map<String, dynamic>.from(i as Map)))
+          .toList();
+      _existingDraft = null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: Color(0xFF143322),
+        content: Text('Draf transaksi berhasil dipulihkan!'),
+      ),
+    );
+  }
+
+  void _discardDraft() async {
+    await TransaksiService().clearDraft();
+    if (!mounted) return;
+    setState(() {
+      _existingDraft = null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: Color(0xFF281116),
+        content: Text('Draf transaksi telah dibuang.'),
+      ),
+    );
+  }
+
+  Future<void> _autoSaveDraft() async {
+    if (_items.isEmpty && _customerName.isEmpty && _vehicleInfo.isEmpty) return;
+    await TransaksiService().saveDraft(
+      code: _trxCode,
+      customerName: _customerName,
+      vehicleInfo: _vehicleInfo,
+      customerPhone: _customerPhone,
+      items: _items,
+      paymentMethod: _paymentMethod,
+    );
+  }
+
+  // 3. Total Bayar Otomatis dari Checkout Item
   int get _totalBayar =>
       _items.fold(0, (total, item) => total + item.total);
 
-  int get _tunaiDiterima {
-    if (_paymentMethod != 'Tunai') return _totalBayar;
-    final parsed = int.tryParse(
-        _cashReceivedController.text.replaceAll(RegExp(r'[^0-9]'), ''));
-    return parsed ?? 0;
-  }
-
-  int get _kembalian =>
-      _paymentMethod == 'Tunai' && _tunaiDiterima >= _totalBayar
-          ? _tunaiDiterima - _totalBayar
-          : 0;
-
   String _formatRupiah(int nominal) => formatRupiah(nominal);
 
+  // 6. Cek Stok Barang dari SparepartService
+  int _getItemStock(String name) {
+    final parts = SparepartService().spareparts;
+    final match = parts.where(
+      (p) => p.name.trim().toLowerCase() == name.trim().toLowerCase(),
+    );
+    if (match.isNotEmpty) {
+      return match.first.stock;
+    }
+    return 0; // Jika barang tidak ditemukan di stok
+  }
+
+  // 2. Edit Data Pelanggan & Motor (Tanpa Plat Nomor)
   void _showEditCustomerDialog() {
     final nameCtrl = TextEditingController(text: _customerName);
     final vehicleCtrl = TextEditingController(text: _vehicleInfo);
-    final platCtrl = TextEditingController(text: _policeNumber);
     final phoneCtrl = TextEditingController(text: _customerPhone);
 
     showDialog(
@@ -131,7 +168,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
               TextField(
                 controller: nameCtrl,
                 style: const TextStyle(color: textWhite, fontSize: 13),
-                decoration: _buildInputDecoration('Nama pelanggan'),
+                decoration: _buildInputDecoration('Contoh: Bpk. Budi'),
               ),
               const SizedBox(height: 12),
               const Text('Motor / Kendaraan', style: TextStyle(color: textMuted, fontSize: 11)),
@@ -140,14 +177,6 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                 controller: vehicleCtrl,
                 style: const TextStyle(color: textWhite, fontSize: 13),
                 decoration: _buildInputDecoration('Contoh: Honda Vario 160'),
-              ),
-              const SizedBox(height: 12),
-              const Text('Nomor Plat', style: TextStyle(color: textMuted, fontSize: 11)),
-              const SizedBox(height: 6),
-              TextField(
-                controller: platCtrl,
-                style: const TextStyle(color: textWhite, fontSize: 13),
-                decoration: _buildInputDecoration('Contoh: B 4921 KDF'),
               ),
               const SizedBox(height: 12),
               const Text('No. WhatsApp / HP', style: TextStyle(color: textMuted, fontSize: 11)),
@@ -175,7 +204,6 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
               setState(() {
                 _customerName = nameCtrl.text.trim();
                 _vehicleInfo = vehicleCtrl.text.trim();
-                _policeNumber = platCtrl.text.trim();
                 _customerPhone = phoneCtrl.text.trim();
               });
               Navigator.pop(ctx);
@@ -187,6 +215,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     );
   }
 
+  // 6. Tambah Item dengan Validasi Keterikatan Stok Barang
   void _addItemToTransaction({
     required String name,
     required String category,
@@ -194,6 +223,40 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     required int price,
     required bool isService,
   }) {
+    if (!isService) {
+      final availableStock = _getItemStock(name);
+      if (availableStock <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF3B1517),
+            content: Text('Stok barang "$name" habis (0 Pcs)! Tidak dapat ditambahkan.'),
+          ),
+        );
+        return;
+      }
+
+      final existingIndex = _items.indexWhere(
+        (i) => i.name.trim().toLowerCase() == name.trim().toLowerCase(),
+      );
+      if (existingIndex >= 0) {
+        if (_items[existingIndex].quantity + 1 > availableStock) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFF3B1517),
+              content: Text(
+                'Batas stok "$name" tercapai! Stok hanya tersedia $availableStock Pcs.',
+              ),
+            ),
+          );
+          return;
+        }
+        setState(() {
+          _items[existingIndex].quantity += 1;
+        });
+        return;
+      }
+    }
+
     setState(() {
       final existingIndex = _items.indexWhere(
         (i) => i.name.trim().toLowerCase() == name.trim().toLowerCase(),
@@ -216,14 +279,14 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     });
   }
 
-  void _handleTambahButton() {
-    if (_selectedCatalogItem != null) {
+  void _handleTambahServiceButton() {
+    if (_selectedServiceItem != null) {
       _addItemToTransaction(
-        name: _selectedCatalogItem!.name,
-        category: _selectedCatalogItem!.category,
-        subInfo: _selectedCatalogItem!.subInfo,
-        price: _selectedCatalogItem!.price,
-        isService: _selectedCatalogItem!.isService,
+        name: _selectedServiceItem!.name,
+        category: _selectedServiceItem!.category,
+        subInfo: _selectedServiceItem!.subInfo,
+        price: _selectedServiceItem!.price,
+        isService: true,
       );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -234,67 +297,48 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
               const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 18),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('1x "${_selectedCatalogItem!.name}" ditambahkan ke transaksi!'),
+                child: Text('1x "${_selectedServiceItem!.name}" ditambahkan ke transaksi!'),
               ),
             ],
           ),
         ),
       );
     } else {
-      _showPickFromHistorySheet(initialCategory: _selectedCatalogType);
+      _showPickFromHistorySheet(initialCategory: 'Jasa Servis');
     }
   }
 
-  void _showPickFromHistorySheet({String? initialCategory}) {
-    String selectedCategory = initialCategory ?? _selectedCatalogType;
+  // 7. Pilih dari Katalog / History: Tampilkan Semua Tanpa Filter Default
+  void _showPickFromHistorySheet({String initialCategory = 'Semua'}) {
+    String selectedCategory = initialCategory;
     String searchQuery = '';
 
     final services = JasaService().services;
     final spareparts = SparepartService().spareparts;
 
-    // Fallback default jika data Firestore belum sinkron atau offline
-    final defaultServices = [
-      {'name': 'Servis Rutin Ringan', 'category': 'Jasa Servis', 'price': 75000, 'isService': true, 'subInfo': 'Tune-up & Injeksi'},
-      {'name': 'Servis CVT Matic Lengkap', 'category': 'Jasa Servis', 'price': 65000, 'isService': true, 'subInfo': 'Pembersihan & Pelumasan CVT'},
-      {'name': 'Ganti Oli & Cek Ringan', 'category': 'Jasa Servis', 'price': 25000, 'isService': true, 'subInfo': 'Ongkos Ganti Oli & Cek Baut'},
-      {'name': 'Overhaul / Turun Mesin', 'category': 'Jasa Servis', 'price': 250000, 'isService': true, 'subInfo': 'Bongkar & Rakit Mesin Total'},
-      {'name': 'Tune Up Injeksi', 'category': 'Jasa Servis', 'price': 85000, 'isService': true, 'subInfo': 'Reset ECU & Injektor'},
-    ];
+    final jasaItems = services.map((j) => {
+      'name': j.name,
+      'category': 'Jasa Servis',
+      'price': j.price,
+      'isService': true,
+      'subInfo': j.category ?? 'Layanan Servis',
+      'stock': null,
+    }).toList();
 
-    final defaultSpareparts = [
-      {'name': 'Oli Mesin MPX2 Matic', 'category': 'Oli & Pelumas', 'price': 54000, 'isService': false, 'subInfo': 'Stok: 12 Pcs', 'stock': 12},
-      {'name': 'Kampas Rem Depan Vario', 'category': 'Pengereman', 'price': 45000, 'isService': false, 'subInfo': 'Stok: 8 Pcs', 'stock': 8},
-      {'name': 'Busi Denso U24EPR9', 'category': 'Kelistrikan', 'price': 25000, 'isService': false, 'subInfo': 'Stok: 15 Pcs', 'stock': 15},
-      {'name': 'Vanbelt / V-Belt Kit', 'category': 'Transmisi CVT', 'price': 135000, 'isService': false, 'subInfo': 'Stok: 5 Pcs', 'stock': 5},
-      {'name': 'Ban Tubeless IRC 90/90-14', 'category': 'Ban & Roda', 'price': 185000, 'isService': false, 'subInfo': 'Stok: 4 Pcs', 'stock': 4},
-    ];
+    // 4. Sparepart diganti istilah Barang
+    final barangItems = spareparts.map((s) => {
+      'name': s.name,
+      'category': s.category,
+      'price': s.sellPrice,
+      'isService': false,
+      'subInfo': 'Stok: ${s.stock} ${s.unit}',
+      'stock': s.stock,
+    }).toList();
 
-    final jasaItems = services.isNotEmpty
-        ? services.map((j) => {
-            'name': j.name,
-            'category': 'Jasa Servis',
-            'price': j.price,
-            'isService': true,
-            'subInfo': j.category ?? 'Layanan Servis',
-            'stock': null,
-          }).toList()
-        : defaultServices;
+    final allCatalogItems = [...jasaItems, ...barangItems];
 
-    final sparepartItems = spareparts.isNotEmpty
-        ? spareparts.map((s) => {
-            'name': s.name,
-            'category': s.category,
-            'price': s.sellPrice,
-            'isService': false,
-            'subInfo': 'Stok: ${s.stock} ${s.unit}',
-            'stock': s.stock,
-          }).toList()
-        : defaultSpareparts;
-
-    final historyItems = [...jasaItems, ...sparepartItems];
-
-    final availableCategories = <String>['Semua', 'Jasa Servis'];
-    for (final s in sparepartItems) {
+    final availableCategories = <String>['Semua', 'Jasa Servis', 'Barang'];
+    for (final s in barangItems) {
       final cat = (s['category'] as String?)?.trim() ?? '';
       if (cat.isNotEmpty && !availableCategories.any((c) => c.toLowerCase() == cat.toLowerCase())) {
         availableCategories.add(cat);
@@ -310,13 +354,23 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
       ),
       builder: (ctx) => StatefulBuilder(
         builder: (context, setSheetState) {
-          final filtered = historyItems.where((h) {
-            final cat = h['category'] as String;
+          final filtered = allCatalogItems.where((h) {
+            final cat = (h['category'] as String).toLowerCase();
             final name = (h['name'] as String).toLowerCase();
-            final matchesCat = selectedCategory == 'Semua' ||
-                cat.toLowerCase() == selectedCategory.toLowerCase();
-            final matchesSearch = searchQuery.isEmpty ||
-                name.contains(searchQuery.toLowerCase());
+            final isService = h['isService'] as bool;
+
+            bool matchesCat = true;
+            if (selectedCategory == 'Semua') {
+              matchesCat = true;
+            } else if (selectedCategory == 'Jasa Servis') {
+              matchesCat = isService;
+            } else if (selectedCategory == 'Barang') {
+              matchesCat = !isService;
+            } else {
+              matchesCat = cat == selectedCategory.toLowerCase();
+            }
+
+            final matchesSearch = searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
             return matchesCat && matchesSearch;
           }).toList();
 
@@ -346,7 +400,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Pilih Layanan / Item dari Katalog',
+                      'Pilih Layanan / Stok Barang',
                       style: TextStyle(
                         color: textWhite,
                         fontSize: 15,
@@ -372,7 +426,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                 ),
                 const SizedBox(height: 12),
 
-                // Search Bar dalam Katalog
+                // Search Bar
                 Container(
                   height: 38,
                   decoration: BoxDecoration(
@@ -384,7 +438,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                     onChanged: (val) => setSheetState(() => searchQuery = val.trim()),
                     style: const TextStyle(color: textWhite, fontSize: 12),
                     decoration: const InputDecoration(
-                      hintText: 'Cari layanan servis atau sparepart...',
+                      hintText: 'Cari layanan servis atau nama barang...',
                       hintStyle: TextStyle(color: textDim, fontSize: 11),
                       prefixIcon: Icon(Icons.search_rounded, color: textDim, size: 18),
                       border: InputBorder.none,
@@ -394,7 +448,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                 ),
                 const SizedBox(height: 12),
 
-                // Bubble filter kategori
+                // Bubble filter kategori (Default: Semua)
                 SizedBox(
                   height: 32,
                   child: ListView.separated(
@@ -433,34 +487,64 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                 // Daftar Item Hasil Filter
                 if (filtered.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    padding: const EdgeInsets.symmetric(vertical: 20),
                     child: Center(
                       child: Column(
                         children: [
                           const Icon(Icons.search_off_rounded, color: textDim, size: 36),
                           const SizedBox(height: 8),
                           const Text(
-                            'Item tidak ditemukan di katalog',
+                            'Item tidak ditemukan di master data',
                             style: TextStyle(color: textMuted, fontSize: 12),
                           ),
-                          const SizedBox(height: 10),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _showAddItemDialog();
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF161A24),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: cardBorder),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const TambahSparepartPage()),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF161A24),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: cardBorder),
+                                  ),
+                                  child: const Text(
+                                    '+ Stok Barang Baru',
+                                    style: TextStyle(color: accentBlue, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
                               ),
-                              child: const Text(
-                                '+ Input Manual Item Ini',
-                                style: TextStyle(color: textWhite, fontSize: 11, fontWeight: FontWeight.bold),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const TambahJasaPage()),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF161A24),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: cardBorder),
+                                  ),
+                                  child: const Text(
+                                    '+ Jasa Baru',
+                                    style: TextStyle(color: accentOrange, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
@@ -484,8 +568,20 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                         final isService = item['isService'] as bool;
                         final stock = item['stock'] as int?;
 
+                        final isOutOfStock = !isService && (stock == null || stock <= 0);
+
                         return InkWell(
                           onTap: () {
+                            if (isOutOfStock) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: const Color(0xFF3B1517),
+                                  content: Text('Barang "$name" stoknya habis (0 Pcs)! Tidak dapat dipilih.'),
+                                ),
+                              );
+                              return;
+                            }
+
                             _addItemToTransaction(
                               name: name,
                               category: category,
@@ -493,16 +589,20 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                               price: price,
                               isService: isService,
                             );
-                            setState(() {
-                              _selectedCatalogItem = TransaksiItemModel(
-                                id: '',
-                                name: name,
-                                category: category,
-                                subInfo: subInfo,
-                                price: price,
-                                isService: isService,
-                              );
-                            });
+
+                            if (isService) {
+                              setState(() {
+                                _selectedServiceItem = TransaksiItemModel(
+                                  id: '',
+                                  name: name,
+                                  category: category,
+                                  subInfo: subInfo,
+                                  price: price,
+                                  isService: true,
+                                );
+                              });
+                            }
+
                             Navigator.pop(ctx);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -554,7 +654,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                                     ],
                                   ),
                                 ),
-                                if (!isService && stock != null && stock <= 0)
+                                if (isOutOfStock)
                                   Container(
                                     margin: const EdgeInsets.only(right: 8),
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -591,180 +691,16 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     );
   }
 
-  void _showAddItemDialog() {
-    final nameCtrl = TextEditingController();
-    final priceCtrl = TextEditingController();
-    bool isJasa = true;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: cardBg,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: cardBorder),
-          ),
-          title: const Text(
-            'Tambah Item Transaksi',
-            style: TextStyle(color: textWhite, fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: ChoiceChip(
-                      label: const Center(child: Text('Jasa Servis')),
-                      selected: isJasa,
-                      selectedColor: accentRed,
-                      backgroundColor: bgDark,
-                      labelStyle: TextStyle(
-                        color: isJasa ? textWhite : textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      onSelected: (val) => setDialogState(() => isJasa = true),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ChoiceChip(
-                      label: const Center(child: Text('Sparepart')),
-                      selected: !isJasa,
-                      selectedColor: accentRed,
-                      backgroundColor: bgDark,
-                      labelStyle: TextStyle(
-                        color: !isJasa ? textWhite : textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      onSelected: (val) => setDialogState(() => isJasa = false),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              // Pilihan Cepat dari Katalog Firestore
-              Builder(
-                builder: (context) {
-                  final services = JasaService().services;
-                  final parts = SparepartService().spareparts;
-                  final suggestions = isJasa
-                      ? services.map((s) => {'name': s.name, 'price': s.price}).toList()
-                      : parts.map((p) => {'name': p.name, 'price': p.sellPrice}).toList();
-
-                  if (suggestions.isEmpty) return const SizedBox.shrink();
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Pilih Cepat dari Katalog:', style: TextStyle(color: textDim, fontSize: 10)),
-                      const SizedBox(height: 4),
-                      SizedBox(
-                        height: 28,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: suggestions.length.clamp(0, 6),
-                          separatorBuilder: (_, _) => const SizedBox(width: 6),
-                          itemBuilder: (context, idx) {
-                            final sug = suggestions[idx];
-                            final sName = sug['name'] as String;
-                            final sPrice = sug['price'] as int;
-                            return ActionChip(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                              visualDensity: VisualDensity.compact,
-                              backgroundColor: bgDark,
-                              side: const BorderSide(color: cardBorder),
-                              label: Text(
-                                sName,
-                                style: const TextStyle(color: textMuted, fontSize: 10),
-                              ),
-                              onPressed: () {
-                                setDialogState(() {
-                                  nameCtrl.text = sName;
-                                  priceCtrl.text = sPrice.toString();
-                                });
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                  );
-                },
-              ),
-              Text(isJasa ? 'Nama Jasa Servis' : 'Nama Sparepart',
-                  style: const TextStyle(color: textMuted, fontSize: 11)),
-              const SizedBox(height: 6),
-              TextField(
-                controller: nameCtrl,
-                style: const TextStyle(color: textWhite, fontSize: 13),
-                decoration: _buildInputDecoration(
-                    isJasa ? 'Contoh: Bersihkan Injektor' : 'Contoh: Kampas Rem Depan'),
-              ),
-              const SizedBox(height: 12),
-              const Text('Harga / Tarif (Rp)', style: TextStyle(color: textMuted, fontSize: 11)),
-              const SizedBox(height: 6),
-              TextField(
-                controller: priceCtrl,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: accentGreen, fontSize: 13, fontWeight: FontWeight.bold),
-                decoration: _buildInputDecoration('Contoh: 35000', prefix: 'Rp '),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Batal', style: TextStyle(color: textDim)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentRed,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () {
-                final name = nameCtrl.text.trim();
-                final price = int.tryParse(priceCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-                if (name.isNotEmpty && price > 0) {
-                  _addItemToTransaction(
-                    name: name,
-                    category: isJasa ? 'Jasa Servis' : 'Sparepart',
-                    subInfo: isJasa ? 'Ongkos Mekanik' : 'Stok Baru',
-                    price: price,
-                    isService: isJasa,
-                  );
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: const Color(0xFF143322),
-                      duration: const Duration(seconds: 1),
-                      content: Row(
-                        children: [
-                          const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text('"$name" ditambahkan ke transaksi!')),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-              },
-              child: const Text('Tambahkan', style: TextStyle(color: textWhite)),
-            ),
-          ],
-        ),
-      ),
-    );
+  // 5. Tambah Item Transaksi Barang Langsung dari Stok Barang
+  void _showAddBarangSheet() {
+    _showPickFromHistorySheet(initialCategory: 'Barang');
   }
 
+  // 7. Tombol Edit Item Transaksi (Qty terbatas oleh stok barang)
   void _showEditItemDialog(TransaksiItemModel item) {
     final priceCtrl = TextEditingController(text: item.price.toString());
     int qty = item.quantity;
+    final maxStock = !item.isService ? _getItemStock(item.name) : 99999;
 
     showDialog(
       context: context,
@@ -776,13 +712,34 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
             side: const BorderSide(color: cardBorder),
           ),
           title: Text(
-            'Edit ${item.name}',
+            'Edit Item: ${item.name}',
             style: const TextStyle(color: textWhite, fontSize: 14, fontWeight: FontWeight.bold),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (!item.isService) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F1A2E),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF1E3A8A)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, color: accentBlue, size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Stok Barang Tersedia: $maxStock Pcs',
+                        style: const TextStyle(color: textWhite, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const Text('Harga Satuan (Rp)', style: TextStyle(color: textMuted, fontSize: 11)),
               const SizedBox(height: 6),
               TextField(
@@ -804,7 +761,18 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                   ),
                   Text('$qty', style: const TextStyle(color: textWhite, fontSize: 15, fontWeight: FontWeight.bold)),
                   IconButton(
-                    onPressed: () => setDialogState(() => qty++),
+                    onPressed: () {
+                      if (!item.isService && qty >= maxStock) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: const Color(0xFF3B1517),
+                            content: Text('Batas stok barang tercapai ($maxStock Pcs)!'),
+                          ),
+                        );
+                        return;
+                      }
+                      setDialogState(() => qty++);
+                    },
                     icon: const Icon(Icons.add_circle_outline, color: accentRed),
                   ),
                 ],
@@ -837,51 +805,69 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     );
   }
 
+  // 3 & 6. Proses Pembayaran (Tanpa Kembalian / Kelebihan, Validasi Stok Barang)
   void _handleProcessPayment() async {
     if (_items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: Color(0xFF3B1517),
-          content: Text('Daftar item transaksi masih kosong!'),
+          content: Text('Daftar item transaksi masih kosong! Tambahkan item terlebih dahulu.'),
         ),
       );
       return;
     }
 
-    if (_paymentMethod == 'Tunai' && _tunaiDiterima < _totalBayar) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: const Color(0xFF3B1517),
-          content: Text(
-            'Uang tunai diterima (${_formatRupiah(_tunaiDiterima)}) kurang dari total pembayaran (${_formatRupiah(_totalBayar)})!',
-          ),
-        ),
-      );
-      return;
+    // 6. Validasi Stok Barang: cegah checkout jika stok habis atau qty melebihi stok
+    for (final item in _items) {
+      if (!item.isService) {
+        final currentStock = _getItemStock(item.name);
+        if (currentStock <= 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFF3B1517),
+              content: Text('Barang "${item.name}" stoknya habis! Hapus dari transaksi untuk melanjutkan.'),
+            ),
+          );
+          return;
+        }
+        if (item.quantity > currentStock) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFF3B1517),
+              content: Text(
+                'Jumlah "${item.name}" (${item.quantity} pcs) melebihi stok tersedia ($currentStock pcs)!',
+              ),
+            ),
+          );
+          return;
+        }
+      }
     }
 
-    final kasirName = widget.userData?['nama_lengkap'] ?? 'Sri Ekowati';
+    final kasirName = widget.userData?['nama_lengkap'] ?? 'Kasir';
 
-    // Buat model transaksi lengkap
+    // 2 & 3. Simpan transaksi (Plat dihapus, Kembalian dihapus, Total murni auto dari items)
     final newTransaction = TransaksiPenjualanModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       code: _trxCode,
       dateTime: DateTime.now(),
-      customerName: _customerName,
+      customerName: _customerName.isNotEmpty ? _customerName : 'Pelanggan Umum',
       vehicleInfo: _vehicleInfo,
-      policeNumber: _policeNumber,
       customerPhone: _customerPhone,
       kasirName: kasirName,
       items: List.from(_items),
       totalBayar: _totalBayar,
       paymentMethod: _paymentMethod,
-      tunaiDiterima: _tunaiDiterima,
-      kembalian: _kembalian,
+      tunaiDiterima: _totalBayar,
+      kembalian: 0,
       status: 'Lunas',
     );
 
     // Simpan ke TransaksiService (Cloud Firestore + Local state)
     final savedTrx = await TransaksiService().saveTransaksi(newTransaction);
+
+    // 8. Hapus draf transaksi setelah pembayaran sukses
+    await TransaksiService().clearDraft();
 
     if (!mounted) return;
 
@@ -922,204 +908,327 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
 
   @override
   Widget build(BuildContext context) {
-    final kasirName = widget.userData?['nama_lengkap'] ?? 'Sri Ekowati';
+    final kasirName = widget.userData?['nama_lengkap'] ?? 'Kasir';
 
-    return AnimatedBuilder(
-      animation: Listenable.merge([
-        JasaService().servicesNotifier,
-        SparepartService().sparepartsNotifier,
-        SparepartService().categoriesNotifier,
-      ]),
-      builder: (context, _) {
-        return Scaffold(
-          backgroundColor: bgDark,
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 1. Header (Tombol Kembali, Judul, No TRX & Kasir)
-                  _buildHeader(kasirName),
-                  const SizedBox(height: 16),
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          _autoSaveDraft();
+        }
+      },
+      child: AnimatedBuilder(
+        animation: Listenable.merge([
+          JasaService().servicesNotifier,
+          SparepartService().sparepartsNotifier,
+          SparepartService().categoriesNotifier,
+        ]),
+        builder: (context, _) {
+          return Scaffold(
+            backgroundColor: bgDark,
+            body: SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 1. Header (Tombol Kembali, Judul, Draf Button & Kasir)
+                    _buildHeader(kasirName),
+                    const SizedBox(height: 16),
 
-                  // 2. Card Data Pelanggan & Motor
-                  _buildDataPelangganCard(),
-                  const SizedBox(height: 16),
+                    // 8. Draf Recovery Alert jika ada transaksi tersimpan sebelumnya
+                    if (_existingDraft != null) ...[
+                      _buildDraftRecoveryBanner(),
+                      const SizedBox(height: 16),
+                    ],
 
-                  // 3. Tab Jasa Servis / Sparepart & Pilih Dari History
-                  _buildServiceSelectorSection(),
-                  const SizedBox(height: 20),
+                    // 2. Card Data Pelanggan & Motor (Tanpa Plat)
+                    _buildDataPelangganCard(),
+                    const SizedBox(height: 16),
 
-                  // 4. Section Daftar Item Transaksi
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Daftar Item Transaksi',
-                        style: TextStyle(
-                          color: textWhite,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
+                    // 7. Section Layanan Jasa Servis Saja (Panjang Full Width)
+                    _buildServiceSelectorSection(),
+                    const SizedBox(height: 20),
+
+                    // 4. Section Daftar Item Transaksi
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Daftar Item Transaksi',
+                          style: TextStyle(
+                            color: textWhite,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF191D2A),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: cardBorder, width: 1),
+                          ),
+                          child: Text(
+                            '${_items.length} Item',
+                            style: const TextStyle(
+                              color: textMuted,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Daftar Item Cards (Tanpa Dummy Awal)
+                    if (_items.isEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF191D2A),
-                          borderRadius: BorderRadius.circular(12),
+                          color: cardBg,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: cardBorder),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.shopping_basket_outlined, color: textDim, size: 36),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Belum ada item ditambahkan',
+                              style: TextStyle(color: textMuted, fontSize: 12),
+                            ),
+                            const SizedBox(height: 12),
+                            GestureDetector(
+                              onTap: () => _showPickFromHistorySheet(initialCategory: 'Semua'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF161A24),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: cardBorder),
+                                ),
+                                child: const Text(
+                                  '+ Pilih dari Katalog & Stok',
+                                  style: TextStyle(color: textWhite, fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ..._items.map((item) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _buildItemCard(item),
+                          )),
+
+                    // 5 & 7. Tombol Tambah Item Transaksi Barang
+                    GestureDetector(
+                      onTap: _showAddBarangSheet,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF11141E),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: cardBorder, width: 1),
                         ),
+                        child: const Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.inventory_2_outlined, color: accentBlue, size: 16),
+                              SizedBox(width: 8),
+                              Text(
+                                '+ Tambah Item Transaksi Barang',
+                                style: TextStyle(
+                                  color: textWhite,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 3. Card Summary & Metode Pembayaran (Tanpa Kembalian / Kelebihan)
+                    _buildSummaryCard(),
+                    const SizedBox(height: 16),
+
+                    // 6. Tombol Besar Proses Pembayaran
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: _handleProcessPayment,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accentRed,
+                          foregroundColor: textWhite,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
                         child: Text(
-                          '${_items.length} Item',
+                          'Proses Pembayaran (${_formatRupiah(_totalBayar)})',
                           style: const TextStyle(
-                            color: textMuted,
-                            fontSize: 10,
+                            fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Daftar Item Cards
-                  if (_items.isEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: cardBg,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: cardBorder),
-                      ),
-                      child: Column(
-                        children: [
-                          const Icon(Icons.remove_shopping_cart_outlined, color: textDim, size: 36),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Belum ada item ditambahkan',
-                            style: TextStyle(color: textMuted, fontSize: 12),
-                          ),
-                          const SizedBox(height: 12),
-                          GestureDetector(
-                            onTap: () => _showPickFromHistorySheet(initialCategory: _selectedCatalogType),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF161A24),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: cardBorder),
-                              ),
-                              child: const Text(
-                                '+ Pilih dari Katalog',
-                                style: TextStyle(color: textWhite, fontSize: 11, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    ..._items.map((item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _buildItemCard(item),
-                        )),
-
-                  // Tombol Tambah Item Transaksi Lainnya
-                  GestureDetector(
-                    onTap: _showAddItemDialog,
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF11141E),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: cardBorder, width: 1),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          '+ Tambah Item Transaksi Lainnya',
-                          style: TextStyle(
-                            color: textMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // 5. Card Summary & Metode Pembayaran
-                  _buildSummaryCard(),
-                  const SizedBox(height: 16),
-
-                  // 6. Tombol Besar Proses Pembayaran
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _handleProcessPayment,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: accentRed,
-                        foregroundColor: textWhite,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        'Proses Pembayaran (${_formatRupiah(_totalBayar)})',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
   Widget _buildHeader(String kasirName) {
     return Row(
       children: [
-        const BackButtonCircle(),
+        BackButtonCircle(
+          onTap: () async {
+            await _autoSaveDraft();
+            if (mounted) Navigator.maybePop(context);
+          },
+        ),
         const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Kasir & Transaksi',
-              style: TextStyle(
-                color: textWhite,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Kasir & Transaksi',
+                style: TextStyle(
+                  color: textWhite,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '$_trxCode • Kasir: $kasirName',
-              style: const TextStyle(
-                color: textMuted,
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
+              const SizedBox(height: 2),
+              Text(
+                '$_trxCode • Kasir: $kasirName',
+                style: const TextStyle(
+                  color: textMuted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
+            ],
+          ),
+        ),
+        // 8. Tombol Manual Simpan Draf
+        GestureDetector(
+          onTap: () async {
+            await _autoSaveDraft();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  backgroundColor: Color(0xFF142C1B),
+                  content: Text('Draf transaksi berhasil disimpan!'),
+                ),
+              );
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF161B26),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: cardBorder),
             ),
-          ],
+            child: const Row(
+              children: [
+                Icon(Icons.save_as_outlined, color: textMuted, size: 14),
+                SizedBox(width: 4),
+                Text(
+                  'Draf',
+                  style: TextStyle(color: textWhite, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
   }
 
+  // 8. Widget Notifikasi Draf Ditemukan
+  Widget _buildDraftRecoveryBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111E30),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accentBlue.withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.history_toggle_off_rounded, color: accentBlue, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Draf Transaksi Ditemukan',
+                  style: TextStyle(
+                    color: textWhite,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  'Ada transaksi yang belum selesai disimpan sebelumnya.',
+                  style: const TextStyle(color: textMuted, fontSize: 10),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: _restoreDraft,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentBlue,
+              foregroundColor: bgDark,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            child: const Text('Lanjutkan', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: _discardDraft,
+            child: const Padding(
+              padding: EdgeInsets.all(4.0),
+              child: Icon(Icons.close_rounded, color: textDim, size: 18),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 1 & 2. Card Data Pelanggan (Tanpa Dummy dan Tanpa Plat Nomor)
   Widget _buildDataPelangganCard() {
+    final hasCustomer = _customerName.isNotEmpty;
+    final hasDetails = _vehicleInfo.isNotEmpty || _customerPhone.isNotEmpty;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -1146,9 +1255,9 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _customerName,
-                  style: const TextStyle(
-                    color: textWhite,
+                  hasCustomer ? _customerName : 'Pelanggan Umum (Belum diisi)',
+                  style: TextStyle(
+                    color: hasCustomer ? textWhite : textMuted,
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1157,9 +1266,11 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$_vehicleInfo ($_policeNumber) • $_customerPhone',
+                  hasDetails
+                      ? '$_vehicleInfo${_vehicleInfo.isNotEmpty && _customerPhone.isNotEmpty ? ' • ' : ''}$_customerPhone'
+                      : 'Ketuk EDIT untuk mengisi info motor & kontak',
                   style: const TextStyle(
-                    color: textMuted,
+                    color: textDim,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
@@ -1194,107 +1305,45 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     );
   }
 
+  // 7. Menu Jasa Servis Panjang (Tab Sparepart Dihapus)
   Widget _buildServiceSelectorSection() {
     return Column(
       children: [
-        // Tab Segmented (Jasa Servis & Sparepart)
-        Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedCatalogType = 'Jasa Servis';
-                    _selectedCatalogItem = null;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 11),
-                  decoration: BoxDecoration(
-                    color: _selectedCatalogType == 'Jasa Servis' ? accentRed : const Color(0xFF141722),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _selectedCatalogType == 'Jasa Servis' ? accentRed : cardBorder,
-                      width: 1,
-                    ),
-                  ),
-                  child: Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.build_rounded,
-                          size: 14,
-                          color: _selectedCatalogType == 'Jasa Servis' ? textWhite : textMuted,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Jasa Servis',
-                          style: TextStyle(
-                            color: _selectedCatalogType == 'Jasa Servis' ? textWhite : textMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
+        // Bar Panjang Penuh Jasa Servis
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF191D2B),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: accentRed.withValues(alpha: 0.8), width: 1.2),
+          ),
+          child: const Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.build_rounded, size: 14, color: accentRed),
+                SizedBox(width: 8),
+                Text(
+                  'Layanan Jasa Servis',
+                  style: TextStyle(
+                    color: textWhite,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedCatalogType = 'Sparepart';
-                    _selectedCatalogItem = null;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 11),
-                  decoration: BoxDecoration(
-                    color: _selectedCatalogType == 'Sparepart' ? accentRed : const Color(0xFF141722),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _selectedCatalogType == 'Sparepart' ? accentRed : cardBorder,
-                      width: 1,
-                    ),
-                  ),
-                  child: Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.token_rounded,
-                          size: 14,
-                          color: _selectedCatalogType == 'Sparepart' ? textWhite : textMuted,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Sparepart',
-                          style: TextStyle(
-                            color: _selectedCatalogType == 'Sparepart' ? textWhite : textMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
         const SizedBox(height: 10),
 
-        // Baris "Pilih dari history / katalog" & Tombol "+ Tambah"
+        // Baris "Pilih Jasa Servis" & Tombol "+ Tambah"
         Row(
           children: [
             Expanded(
               child: GestureDetector(
-                onTap: () => _showPickFromHistorySheet(initialCategory: _selectedCatalogType),
+                onTap: () => _showPickFromHistorySheet(initialCategory: 'Jasa Servis'),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                   decoration: BoxDecoration(
@@ -1305,24 +1354,20 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                   child: Row(
                     children: [
                       Icon(
-                        _selectedCatalogItem != null
-                            ? (_selectedCatalogItem!.isService ? Icons.build_rounded : Icons.token_rounded)
-                            : Icons.search_rounded,
-                        color: _selectedCatalogItem != null
-                            ? (_selectedCatalogItem!.isService ? accentOrange : accentBlue)
-                            : textDim,
+                        _selectedServiceItem != null ? Icons.build_rounded : Icons.search_rounded,
+                        color: _selectedServiceItem != null ? accentOrange : textDim,
                         size: 16,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          _selectedCatalogItem != null
-                              ? '${_selectedCatalogItem!.name} (${_formatRupiah(_selectedCatalogItem!.price)})'
-                              : 'Pilih dari history / katalog ($_selectedCatalogType)',
+                          _selectedServiceItem != null
+                              ? '${_selectedServiceItem!.name} (${_formatRupiah(_selectedServiceItem!.price)})'
+                              : 'Pilih layanan jasa servis...',
                           style: TextStyle(
-                            color: _selectedCatalogItem != null ? textWhite : textMuted,
+                            color: _selectedServiceItem != null ? textWhite : textMuted,
                             fontSize: 11.5,
-                            fontWeight: _selectedCatalogItem != null ? FontWeight.bold : FontWeight.w500,
+                            fontWeight: _selectedServiceItem != null ? FontWeight.bold : FontWeight.w500,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1337,7 +1382,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
             ),
             const SizedBox(width: 8),
             GestureDetector(
-              onTap: _handleTambahButton,
+              onTap: _handleTambahServiceButton,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                 decoration: BoxDecoration(
@@ -1360,7 +1405,11 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     );
   }
 
+  // 6 & 7. Card Item Transaksi dengan Pengaitan Stok Barang Real
   Widget _buildItemCard(TransaksiItemModel item) {
+    final availableStock = !item.isService ? _getItemStock(item.name) : null;
+    final isMaxReached = !item.isService && availableStock != null && item.quantity >= availableStock;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1411,7 +1460,9 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${item.category} • ${item.subInfo} • ${item.quantity}x',
+                  item.isService
+                      ? '${item.category} • ${item.quantity}x'
+                      : 'Barang • Stok: $availableStock • ${item.quantity}x',
                   style: const TextStyle(
                     color: textMuted,
                     fontSize: 9.5,
@@ -1429,7 +1480,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                       ),
                     ),
                     const Spacer(),
-                    // Tombol Kontrol Qty Langsung (-)
+                    // Tombol Kontrol Qty (-)
                     GestureDetector(
                       onTap: () {
                         setState(() {
@@ -1464,9 +1515,21 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                         ),
                       ),
                     ),
-                    // Tombol Kontrol Qty Langsung (+)
+                    // Tombol Kontrol Qty (+) dengan link batas stok
                     GestureDetector(
                       onTap: () {
+                        if (!item.isService) {
+                          final stock = _getItemStock(item.name);
+                          if (item.quantity + 1 > stock) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: const Color(0xFF3B1517),
+                                content: Text('Batas stok barang tercapai ($stock Pcs)!'),
+                              ),
+                            );
+                            return;
+                          }
+                        }
                         setState(() {
                           item.quantity++;
                         });
@@ -1475,12 +1538,16 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                         width: 22,
                         height: 22,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF161A24),
+                          color: isMaxReached ? const Color(0xFF161820) : const Color(0xFF161A24),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: cardBorder),
+                          border: Border.all(color: isMaxReached ? textDim : cardBorder),
                         ),
-                        child: const Center(
-                          child: Icon(Icons.add, color: textWhite, size: 12),
+                        child: Center(
+                          child: Icon(
+                            Icons.add,
+                            color: isMaxReached ? textDim : textWhite,
+                            size: 12,
+                          ),
                         ),
                       ),
                     ),
@@ -1491,7 +1558,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
           ),
           const SizedBox(width: 10),
 
-          // Tombol Edit
+          // 7. Tombol Edit
           GestureDetector(
             onTap: () => _showEditItemDialog(item),
             child: Container(
@@ -1539,6 +1606,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     );
   }
 
+  // 3. Card Summary (Hapus Kelebihan, Hapus Kembalian, Hapus Input Manual Tunai)
   Widget _buildSummaryCard() {
     return Container(
       width: double.infinity,
@@ -1646,59 +1714,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
             ],
           ),
 
-          if (_paymentMethod == 'Tunai') ...[
-            const SizedBox(height: 14),
-            const Text(
-              'Uang Tunai Diterima',
-              style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _cashReceivedController,
-              keyboardType: TextInputType.number,
-              onChanged: (_) => setState(() {}),
-              style: const TextStyle(color: textWhite, fontSize: 13, fontWeight: FontWeight.bold),
-              decoration: _buildInputDecoration('Nominal tunai', prefix: 'Rp '),
-            ),
-            const SizedBox(height: 8),
-            // Quick Amount Buttons
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                _buildQuickCashPill('Uang Pas', _totalBayar),
-                _buildQuickCashPill('50rb', 50000),
-                _buildQuickCashPill('100rb', 100000),
-                _buildQuickCashPill('200rb', 200000),
-                _buildQuickCashPill('500rb', 500000),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: bgDark,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: cardBorder),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Kembalian', style: TextStyle(color: textMuted, fontSize: 11)),
-                  Text(
-                    _tunaiDiterima >= _totalBayar
-                        ? _formatRupiah(_kembalian)
-                        : 'Kurang ${_formatRupiah(_totalBayar - _tunaiDiterima)}',
-                    style: TextStyle(
-                      color: _tunaiDiterima >= _totalBayar ? accentGreen : accentRed,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ] else ...[
+          if (_paymentMethod == 'QRIS') ...[
             const SizedBox(height: 14),
             Container(
               width: double.infinity,
@@ -1708,8 +1724,8 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: const Color(0xFF1E3A8A)),
               ),
-              child: Row(
-                children: const [
+              child: const Row(
+                children: [
                   Icon(Icons.qr_code_scanner_rounded, color: accentBlue, size: 24),
                   SizedBox(width: 10),
                   Expanded(
@@ -1723,28 +1739,6 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
             ),
           ],
         ],
-      ),
-    );
-  }
-
-  Widget _buildQuickCashPill(String label, int amount) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _cashReceivedController.text = amount.toString();
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: const Color(0xFF101420),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: cardBorder),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(color: textMuted, fontSize: 10, fontWeight: FontWeight.bold),
-        ),
       ),
     );
   }
