@@ -102,8 +102,8 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
       _selectedExistingItem = item;
       _namaBarangController.text = item.name;
       _kategoriController.text = item.category;
-      _buyPriceController.text = item.buyPrice.toString();
-      _sellPriceController.text = item.sellPrice.toString();
+      _buyPriceController.text = formatRibuan(item.buyPrice);
+      _sellPriceController.text = formatRibuan(item.sellPrice);
       _unitController.text = item.unit.isNotEmpty ? item.unit : 'Pcs';
       _currentQty = 1;
     });
@@ -416,8 +416,8 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
 
   // Dialog Edit Item di Daftar Pasokan
   void _showEditRestockItemDialog(RestockItemModel item) {
-    final buyCtrl = TextEditingController(text: item.buyPrice.toString());
-    final sellCtrl = TextEditingController(text: item.sellPrice.toString());
+    final buyCtrl = TextEditingController(text: formatRibuan(item.buyPrice));
+    final sellCtrl = TextEditingController(text: formatRibuan(item.sellPrice));
     int qty = item.quantity;
 
     showDialog(
@@ -457,6 +457,18 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(vertical: 10),
                     ),
+                    onChanged: (val) {
+                      final clean = val.replaceAll(RegExp(r'[^0-9]'), '');
+                      if (clean.isNotEmpty) {
+                        final formatted = formatRibuan(int.parse(clean));
+                        if (formatted != val) {
+                          buyCtrl.value = TextEditingValue(
+                            text: formatted,
+                            selection: TextSelection.collapsed(offset: formatted.length),
+                          );
+                        }
+                      }
+                    },
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -479,6 +491,18 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(vertical: 10),
                     ),
+                    onChanged: (val) {
+                      final clean = val.replaceAll(RegExp(r'[^0-9]'), '');
+                      if (clean.isNotEmpty) {
+                        final formatted = formatRibuan(int.parse(clean));
+                        if (formatted != val) {
+                          sellCtrl.value = TextEditingValue(
+                            text: formatted,
+                            selection: TextSelection.collapsed(offset: formatted.length),
+                          );
+                        }
+                      }
+                    },
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -962,10 +986,20 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
                                           contentPadding: EdgeInsets.symmetric(vertical: 10),
                                         ),
                                         onChanged: (val) {
+                                          final clean = val.replaceAll(RegExp(r'[^0-9]'), '');
+                                          if (clean.isNotEmpty) {
+                                            final formatted = formatRibuan(int.parse(clean));
+                                            if (formatted != val) {
+                                              _buyPriceController.value = TextEditingValue(
+                                                text: formatted,
+                                                selection: TextSelection.collapsed(offset: formatted.length),
+                                              );
+                                            }
+                                          }
                                           final b = _parseNominal(val);
                                           // Otomatis rekomendasikan harga jual 25% jika harga jual belum diisi
                                           if (_sellPriceController.text.isEmpty && b > 0) {
-                                            _sellPriceController.text = (b * 1.25).round().toString();
+                                            _sellPriceController.text = formatRibuan((b * 1.25).round());
                                           }
                                           setState(() {});
                                         },
@@ -1010,7 +1044,19 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
                                           border: InputBorder.none,
                                           contentPadding: EdgeInsets.symmetric(vertical: 10),
                                         ),
-                                        onChanged: (_) => setState(() {}),
+                                        onChanged: (val) {
+                                          final clean = val.replaceAll(RegExp(r'[^0-9]'), '');
+                                          if (clean.isNotEmpty) {
+                                            final formatted = formatRibuan(int.parse(clean));
+                                            if (formatted != val) {
+                                              _sellPriceController.value = TextEditingValue(
+                                                text: formatted,
+                                                selection: TextSelection.collapsed(offset: formatted.length),
+                                              );
+                                            }
+                                          }
+                                          setState(() {});
+                                        },
                                       ),
                                     ),
                                   ],
