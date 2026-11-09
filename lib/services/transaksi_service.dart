@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'sparepart_service.dart';
+import 'barang_service.dart';
 
 class TransaksiItemModel {
   String id;
@@ -230,7 +230,7 @@ class TransaksiService {
     if (trx.status.toUpperCase() == 'LUNAS') {
       for (final item in trx.items) {
         if (!item.isService) {
-          SparepartService().adjustStock(item.name, -item.quantity);
+          BarangService().adjustStock(item.name, -item.quantity);
         }
       }
     }

@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'sparepart_service.dart';
+import 'barang_service.dart';
 
 class RestockItemModel {
   String id;
@@ -189,7 +189,7 @@ class PembelianService {
 
     // 2. Tambah stok barang yang direstock (atau buat barang baru jika belum ada di data stok)
     for (final item in pembelian.items) {
-      SparepartService().addOrAdjustStock(
+      BarangService().addOrAdjustStock(
         name: item.name,
         category: item.category,
         buyPrice: item.buyPrice,

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../components/back_button_circle.dart';
 import '../../components/rupiah_formatter.dart';
 import '../../services/jasa_service.dart';
-import '../../services/sparepart_service.dart';
+import '../../services/barang_service.dart';
 import '../../services/transaksi_service.dart';
 import '../kelola_stok_jasa.dart';
 
@@ -75,9 +75,9 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
 
   String _formatRupiah(int nominal) => formatRupiah(nominal);
 
-  // Cek Stok Barang dari SparepartService
+  // Cek Stok Barang dari BarangService
   int _getItemStock(String name) {
-    final parts = SparepartService().spareparts;
+    final parts = BarangService().barangs;
     final match = parts.where(
       (p) => p.name.trim().toLowerCase() == name.trim().toLowerCase(),
     );
@@ -466,7 +466,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
   // Modal Sheet: Khusus Barang Saja dari Data Stok (Tanpa Jasa Servis)
   void _showPickBarangSheet() {
     String searchQuery = '';
-    final liveBarang = SparepartService().spareparts;
+    final liveBarang = BarangService().barangs;
 
     showModalBottomSheet(
       context: context,
@@ -976,7 +976,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     return AnimatedBuilder(
       animation: Listenable.merge([
         JasaService().servicesNotifier,
-        SparepartService().sparepartsNotifier,
+        BarangService().barangsNotifier,
       ]),
       builder: (context, _) {
         return Scaffold(
