@@ -324,9 +324,9 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
           ),
           const SizedBox(height: 16),
 
-          // Bagian 1: Penjualan Sparepart (26 pcs)
+          // Bagian 1: Penjualan Barang (26 pcs)
           const Text(
-            '• Penjualan Sparepart (26 pcs)',
+            '• Penjualan Barang (26 pcs)',
             style: TextStyle(
               color: Color(0xFF38BDF8),
               fontSize: 11.5,
@@ -597,7 +597,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                 child: CustomPaint(
                   painter: _DonutChartPainter(
                     servisPercent: 0.45,
-                    sparepartPercent: 0.55,
+                    barangPercent: 0.55,
                   ),
                   child: const Center(
                     child: Column(
@@ -612,7 +612,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                           ),
                         ),
                         Text(
-                          'Part',
+                          'Barang',
                           style: TextStyle(
                             color: textDim,
                             fontSize: 9.5,
@@ -668,7 +668,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Sparepart (Square Box Blue)
+                    // Barang (Square Box Blue)
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -687,7 +687,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Sparepart (55%)',
+                                'Barang (55%)',
                                 style: TextStyle(
                                   color: textWhite,
                                   fontSize: 12,
@@ -775,7 +775,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
             children: [
               _buildLegendDot(accentRed, 'Servis'),
               const SizedBox(width: 14),
-              _buildLegendDot(accentBlue, 'Sparepart'),
+              _buildLegendDot(accentBlue, 'Barang'),
             ],
           ),
           const SizedBox(height: 16),
@@ -1061,11 +1061,11 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
 /// Painter untuk Donut Chart Sumber Pendapatan
 class _DonutChartPainter extends CustomPainter {
   final double servisPercent;
-  final double sparepartPercent;
+  final double barangPercent;
 
   _DonutChartPainter({
     required this.servisPercent,
-    required this.sparepartPercent,
+    required this.barangPercent,
   });
 
   @override
@@ -1082,14 +1082,14 @@ class _DonutChartPainter extends CustomPainter {
 
     final rect = Rect.fromCircle(center: center, radius: radius);
 
-    // Blue arc (Sparepart 55%)
+    // Blue arc (Barang 55%)
     final paintBlue = Paint()
       ..color = const Color(0xFF38BDF8)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 9
       ..strokeCap = StrokeCap.round;
 
-    final sweepBlue = 2 * math.pi * sparepartPercent;
+    final sweepBlue = 2 * math.pi * barangPercent;
     canvas.drawArc(rect, -math.pi / 2, sweepBlue, false, paintBlue);
 
     // Red arc (Servis 45%)

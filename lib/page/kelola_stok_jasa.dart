@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../components/moto_bottom_nav.dart';
-import 'stok/data_sparepart.dart';
+import 'stok/data_barang.dart';
 import 'stok/master_jasa.dart';
 import 'stok/tambah_jasa.dart';
-import 'stok/tambah_sparepart.dart';
+import 'stok/tambah_barang.dart';
 
 /// Screen 11 - (FR05, FR06) Navigasi Tambah Data Stok & Jasa
 class KelolaStokJasaPage extends StatefulWidget {
@@ -52,23 +52,23 @@ class _KelolaStokJasaPageState extends State<KelolaStokJasaPage> {
               ),
               const SizedBox(height: 20),
 
-              // 2. Card 1: Tambah Sparepart & Stok (FR05)
+              // 2. Card 1: Tambah Barang & Stok (FR05)
               _buildCategoryCard(
-                title: 'Tambah Sparepart & Stok',
+                title: 'Tambah Barang & Stok',
                 description:
                     'Input stok baru suku cadang, oli, ban, busi, aki, kampas rem, serta atur harga modal & jual.',
                 icon: Icons.all_inbox_rounded,
                 iconColor: accentBlue,
                 iconBg: const Color(0xFF101B2B),
                 borderColor: const Color(0xFF1E3A5F),
-                buttonLabel: 'Buka Data Stok ›',
+                buttonLabel: 'Buka Data Barang ›',
                 buttonBg: const Color(0xFF0F1E33),
                 buttonTextColor: const Color(0xFF60A5FA),
                 onCardTap: () async {
                   final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const TambahSparepartPage(),
+                      builder: (context) => const TambahBarangPage(),
                     ),
                   );
                   if (result != null && mounted) {
@@ -86,7 +86,7 @@ class _KelolaStokJasaPageState extends State<KelolaStokJasaPage> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Sparepart "${result.name}" berhasil ditambahkan ke database!',
+                                'Barang "${result.name}" berhasil ditambahkan ke database!',
                                 style: const TextStyle(color: Colors.white),
                               ),
                             ),
@@ -101,7 +101,7 @@ class _KelolaStokJasaPageState extends State<KelolaStokJasaPage> {
                     context,
                     MaterialPageRoute(
                       builder: (context) =>
-                          DataSparepartPage(userData: widget.userData),
+                          DataBarangPage(userData: widget.userData),
                     ),
                   );
                 },

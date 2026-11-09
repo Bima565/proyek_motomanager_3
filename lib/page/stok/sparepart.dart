@@ -1,7 +1,6 @@
-// Backward compatibility alias for FR05: Data Sparepart
-// Disarankan mengimpor langsung 'data_sparepart.dart'
+// Backward compatibility alias for FR05: Data Barang
+export 'data_barang.dart';
+import 'data_barang.dart';
 
-export 'data_sparepart.dart';
-import 'data_sparepart.dart';
-
-typedef SparepartPage = DataSparepartPage;
+typedef SparepartPage = DataBarangPage;
+typedef BarangPage = DataBarangPage;

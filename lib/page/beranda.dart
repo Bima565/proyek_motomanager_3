@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../components/create_password_dialog.dart';
 import '../components/moto_bottom_nav.dart';
 import '../hooks/firebase_auth.dart';
-import 'stok/data_sparepart.dart';
+import 'stok/data_barang.dart';
 import 'kelola_stok_jasa.dart';
 import 'laporan_pendapatan.dart';
 import 'login.dart';
@@ -436,7 +436,7 @@ class _BerandaPageState extends State<BerandaPage> {
           ),
           const SizedBox(height: 12),
 
-          // Baris Legend: Servis & Sparepart
+          // Baris Legend: Servis & Barang
           Row(
             children: [
               // Legend Servis
@@ -458,7 +458,7 @@ class _BerandaPageState extends State<BerandaPage> {
                 ),
               ),
               const SizedBox(width: 16),
-              // Legend Sparepart
+              // Legend Barang
               Container(
                 width: 14,
                 height: 2.5,
@@ -469,7 +469,7 @@ class _BerandaPageState extends State<BerandaPage> {
               ),
               const SizedBox(width: 6),
               const Text(
-                'Sparepart (Rp 75k)',
+                'Barang (Rp 75k)',
                 style: TextStyle(
                   color: textMuted,
                   fontSize: 10,
@@ -513,7 +513,7 @@ class _BerandaPageState extends State<BerandaPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => DataSparepartPage(
+                    builder: (context) => DataBarangPage(
                       userData: _liveUserData ?? widget.userData,
                     ),
                   ),
@@ -599,7 +599,7 @@ class _BerandaPageState extends State<BerandaPage> {
           ),
           const SizedBox(width: 14),
 
-          // Detail Sparepart
+          // Detail Barang
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -630,7 +630,7 @@ class _BerandaPageState extends State<BerandaPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => DataSparepartPage(
+                  builder: (context) => DataBarangPage(
                     userData: _liveUserData ?? widget.userData,
                   ),
                 ),
@@ -759,7 +759,7 @@ class HourlyDualLineChartPainter extends CustomPainter {
 
     // Nilai Red (Servis) dalam rasio 0.0 - 1.0 (15k = 1.0)
     final redValues = [0.65, 0.35, 1.0, 0.35, 0.0, 0.35, 0.65, 0.35, 0.65, 0.0];
-    // Nilai Blue (Sparepart)
+    // Nilai Blue (Barang)
     final blueValues = [0.65, 0.65, 1.0, 0.65, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35];
 
     final textStyle = const TextStyle(
@@ -859,7 +859,7 @@ class HourlyDualLineChartPainter extends CustomPainter {
       ).createShader(Rect.fromLTWH(0, topGutter, size.width, chartHeight));
     canvas.drawPath(fillPath, fillPaint);
 
-    // 4. Gambar Garis Biru (Sparepart)
+    // 4. Gambar Garis Biru (Barang)
     final bluePath = Path()..moveTo(bluePoints.first.dx, bluePoints.first.dy);
     for (int i = 1; i < bluePoints.length; i++) {
       bluePath.lineTo(bluePoints[i].dx, bluePoints[i].dy);

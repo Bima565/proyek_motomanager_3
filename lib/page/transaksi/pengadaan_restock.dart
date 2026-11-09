@@ -3,7 +3,7 @@ import '../../components/back_button_circle.dart';
 import '../../components/custom_calendar_dialog.dart';
 import '../../components/rupiah_formatter.dart';
 import '../../services/pembelian_service.dart';
-import '../../services/sparepart_service.dart';
+import '../../services/barang_service.dart';
 
 export '../../services/pembelian_service.dart' show RestockItemModel, PembelianRecord;
 
@@ -41,7 +41,7 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
   int _inputMode = 0;
 
   // Barang Terpilih dari Master Data (jika mode 0)
-  SparepartModel? _selectedExistingItem;
+  BarangModel? _selectedExistingItem;
 
   // Controller Form Barang
   final TextEditingController _namaBarangController = TextEditingController();
@@ -96,7 +96,7 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
   }
 
   // Pilih Barang dari Master Data
-  void _selectItemFromMaster(SparepartModel item) {
+  void _selectItemFromMaster(BarangModel item) {
     setState(() {
       _inputMode = 0;
       _selectedExistingItem = item;
@@ -126,7 +126,7 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
   // Buka Modal Sheet Pencarian Barang dari Master Data
   void _showPickMasterItemSheet() {
     String searchQuery = '';
-    final masterList = SparepartService().spareparts;
+    final masterList = BarangService().barangs;
 
     showModalBottomSheet(
       context: context,

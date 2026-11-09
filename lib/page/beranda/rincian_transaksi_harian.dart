@@ -328,7 +328,7 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
                               Text('Servis (46%)', style: TextStyle(color: textMuted, fontSize: 8.5)),
                               Text('Rp 65.000', style: TextStyle(color: Color(0xFFFF3B44), fontSize: 9.5, fontWeight: FontWeight.bold)),
                               SizedBox(height: 3),
-                              Text('Sparepart (54%)', style: TextStyle(color: textMuted, fontSize: 8.5)),
+                              Text('Barang (54%)', style: TextStyle(color: textMuted, fontSize: 8.5)),
                               Text('Rp 75.000', style: TextStyle(color: Color(0xFF60A5FA), fontSize: 9.5, fontWeight: FontWeight.bold)),
                             ],
                           ),
