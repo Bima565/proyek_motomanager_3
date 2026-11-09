@@ -75,15 +75,9 @@ class BarangService {
   ValueNotifier<List<BarangModel>> get sparepartsNotifier => barangsNotifier;
   List<BarangModel> get spareparts => barangs;
 
-  // Riwayat Kategori Barang (Dibatasi 5 riwayat terbaru)
+  // Daftar Kategori Barang (Tersinkronisasi urutannya langsung dengan Cloud Firestore)
   final ValueNotifier<List<String>> categoriesNotifier =
-      ValueNotifier<List<String>>([
-    'Oli & Pelumas',
-    'Pengereman',
-    'Kelistrikan',
-    'Ban & Roda',
-    'Transmisi CVT',
-  ]);
+      ValueNotifier<List<String>>([]);
 
   List<String> get categories => categoriesNotifier.value;
 
@@ -127,13 +121,13 @@ class BarangService {
         },
       );
 
-      // Listen riwayat kategori yang tersimpan di Firestore settings: 'kategori_barang'
+      // Listen kategori barang di Firestore collection: 'kategori', doc: 'kategori_barang'
       _firestore
-          .collection('settings')
+          .collection('kategori')
           .doc('kategori_barang')
           .snapshots()
           .listen(
-        (snapshot) {
+        (snapshot) async {
           if (snapshot.exists && snapshot.data() != null) {
             final dataList = (snapshot.data()?['categories'] as List<dynamic>?)
                 ?.map((e) => e.toString().trim())
@@ -141,12 +135,33 @@ class BarangService {
                 .toList() ??
                 [];
             if (dataList.isNotEmpty) {
-              categoriesNotifier.value = dataList.take(5).toList();
+              categoriesNotifier.value = dataList;
+            }
+          } else {
+            // Migrasi otomatis jika data kategori masih berada di koleksi lama 'settings'
+            try {
+              final oldDoc = await _firestore.collection('settings').doc('kategori_barang').get();
+              if (oldDoc.exists && oldDoc.data() != null) {
+                final oldDataList = (oldDoc.data()?['categories'] as List<dynamic>?)
+                    ?.map((e) => e.toString().trim())
+                    .where((e) => e.isNotEmpty)
+                    .toList() ??
+                    [];
+                if (oldDataList.isNotEmpty) {
+                  categoriesNotifier.value = oldDataList;
+                  await _firestore.collection('kategori').doc('kategori_barang').set({
+                    'categories': oldDataList,
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  }, SetOptions(merge: true));
+                }
+              }
+            } catch (e) {
+              debugPrint('Migration settings -> kategori error: $e');
             }
           }
         },
         onError: (err) {
-          debugPrint('Firestore kategori_barang stream error: $err');
+          debugPrint('Firestore kategori stream error: $err');
         },
       );
     } catch (e) {
@@ -155,32 +170,32 @@ class BarangService {
   }
 
   void _populateCategoriesFromBarangs(List<BarangModel> list) {
-    if (categoriesNotifier.value.isNotEmpty &&
-        categoriesNotifier.value.length >= 5) {
-      return;
-    }
-    final cats = <String>[];
+    if (list.isEmpty) return;
+
+    final current = List<String>.from(categoriesNotifier.value);
+    bool changed = false;
+
+    // Tambahkan kategori baru yang ada di barang tapi belum terdaftar di kategori
     for (final s in list) {
       final c = s.category.trim();
       if (c.isNotEmpty &&
-          !cats.any((item) => item.toLowerCase() == c.toLowerCase())) {
-        cats.add(c);
-        if (cats.length == 5) break;
+          !current.any((item) => item.toLowerCase() == c.toLowerCase())) {
+        current.add(c);
+        changed = true;
       }
     }
-    for (final def in [
-      'Oli & Pelumas',
-      'Pengereman',
-      'Kelistrikan',
-      'Ban & Roda',
-      'Transmisi CVT',
-    ]) {
-      if (cats.length >= 5) break;
-      if (!cats.any((item) => item.toLowerCase() == def.toLowerCase())) {
-        cats.add(def);
+
+    if (changed) {
+      categoriesNotifier.value = current;
+      try {
+        _firestore.collection('kategori').doc('kategori_barang').set({
+          'categories': current,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('Firestore sync categories from barang error: $e');
       }
     }
-    categoriesNotifier.value = cats.take(5).toList();
   }
 
   Future<void> addCategoryHistory(String newCategory) async {
@@ -188,32 +203,95 @@ class BarangService {
     if (trimmed.isEmpty) return;
 
     List<String> current = List<String>.from(categoriesNotifier.value);
-    current.removeWhere((c) => c.toLowerCase() == trimmed.toLowerCase());
-    current.insert(0, trimmed);
-    if (current.length > 5) {
-      current = current.sublist(0, 5);
-    }
-    categoriesNotifier.value = current;
+    final exists = current.any((c) => c.toLowerCase() == trimmed.toLowerCase());
+    if (!exists) {
+      // Kategori baru masuk ke nomor atau field seterusnya (di akhir list)
+      current.add(trimmed);
+      categoriesNotifier.value = current;
 
-    try {
-      await _firestore.collection('settings').doc('kategori_barang').set({
-        'categories': current,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-    } catch (e) {
-      debugPrint('Firestore save category history error: $e');
+      try {
+        await _firestore.collection('kategori').doc('kategori_barang').set({
+          'categories': current,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('Firestore save category error: $e');
+      }
+    }
+  }
+
+  /// Hapus kategori dari database Firestore dan perbarui daftar barang terkait
+  Future<void> deleteCategory(String categoryName) async {
+    final trimmed = categoryName.trim();
+    if (trimmed.isEmpty) return;
+
+    // 1. Hapus dari categoriesNotifier dan update Firestore kategori/kategori_barang
+    List<String> current = List<String>.from(categoriesNotifier.value);
+    final initialLen = current.length;
+    current.removeWhere((c) => c.toLowerCase() == trimmed.toLowerCase());
+
+    if (current.length != initialLen) {
+      categoriesNotifier.value = current;
+      try {
+        await _firestore.collection('kategori').doc('kategori_barang').set({
+          'categories': current,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('Firestore delete category error: $e');
+      }
+    }
+
+    // 2. Jika masih ada barang yang menggunakan kategori ini, ubah kategorinya ke 'Lainnya'
+    final itemsWithCat = barangsNotifier.value.where(
+      (b) => b.category.trim().toLowerCase() == trimmed.toLowerCase(),
+    ).toList();
+
+    for (final item in itemsWithCat) {
+      item.category = 'Lainnya';
+      try {
+        await _firestore.collection('barang').doc(item.id).update({
+          'category': 'Lainnya',
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        debugPrint('Firestore update barang category fallback error: $e');
+      }
+    }
+    if (itemsWithCat.isNotEmpty) {
+      barangsNotifier.value = List<BarangModel>.from(barangsNotifier.value);
     }
   }
 
   Future<void> saveBarang(BarangModel item) async {
     final list = List<BarangModel>.from(barangsNotifier.value);
     final idx = list.indexWhere((s) => s.id == item.id || s.name.toLowerCase() == item.name.toLowerCase());
+    String? oldCategory;
     if (idx >= 0) {
+      oldCategory = list[idx].category.trim();
       list[idx] = item;
     } else {
       list.insert(0, item);
     }
     barangsNotifier.value = list;
+
+    // Pastikan kategori barang otomatis tersimpan ke koleksi kategori Firestore
+    if (item.category.trim().isNotEmpty) {
+      await addCategoryHistory(item.category.trim());
+    }
+
+    // Jika kategori berubah dan kategori lama tidak lagi digunakan barang lain, bersihkan dari kategori Firestore
+    if (oldCategory != null &&
+        oldCategory.isNotEmpty &&
+        oldCategory.toLowerCase() != 'lainnya' &&
+        oldCategory.toLowerCase() != item.category.trim().toLowerCase()) {
+      final isOldCatStillUsed = list.any(
+        (b) => b.category.trim().toLowerCase() == oldCategory!.toLowerCase(),
+      );
+      if (!isOldCatStillUsed) {
+        await deleteCategory(oldCategory);
+      }
+    }
 
     try {
       if (item.id.isNotEmpty && !item.id.startsWith('temp_')) {
@@ -228,6 +306,12 @@ class BarangService {
   }
 
   Future<void> deleteBarang(String id) async {
+    final itemToDelete = barangsNotifier.value.firstWhere(
+      (s) => s.id == id,
+      orElse: () => BarangModel(id: '', name: '', category: '', buyPrice: 0, sellPrice: 0, stock: 0, lastUpdated: ''),
+    );
+    final deletedCategory = itemToDelete.category.trim();
+
     barangsNotifier.value =
         barangsNotifier.value.where((s) => s.id != id).toList();
 
@@ -235,6 +319,17 @@ class BarangService {
       await _firestore.collection('barang').doc(id).delete();
     } catch (e) {
       debugPrint('Firestore deleteBarang error: $e');
+    }
+
+    // Periksa apakah kategori barang yang dihapus masih digunakan oleh barang lain
+    if (deletedCategory.isNotEmpty && deletedCategory.toLowerCase() != 'lainnya') {
+      final isCategoryStillUsed = barangsNotifier.value.any(
+        (s) => s.category.trim().toLowerCase() == deletedCategory.toLowerCase(),
+      );
+      if (!isCategoryStillUsed) {
+        // Kategori sudah tidak ada di barang manapun, otomatis hapus juga dari koleksi kategori Firestore!
+        await deleteCategory(deletedCategory);
+      }
     }
   }
 
@@ -251,6 +346,10 @@ class BarangService {
     required int quantity,
     String unit = 'Pcs',
   }) async {
+    if (category.trim().isNotEmpty) {
+      addCategoryHistory(category.trim());
+    }
+
     final list = List<BarangModel>.from(barangsNotifier.value);
     final idx = list.indexWhere((s) => s.name.trim().toLowerCase() == name.trim().toLowerCase());
     if (idx >= 0) {

@@ -31,10 +31,6 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
   @override
   void initState() {
     super.initState();
-    final categories = BarangService().categoriesNotifier.value;
-    if (categories.isNotEmpty) {
-      _categoryController.text = categories.first;
-    }
   }
 
   @override
@@ -77,7 +73,7 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
         lastUpdated: dateStr,
       );
 
-      // Simpan riwayat kategori terbaru (maksimal 5, riwayat lama ke-6 otomatis dihapus)
+      // Simpan kategori barang ke Firestore kategori/kategori_barang
       await BarangService().addCategoryHistory(category);
 
       // Simpan data barang ke Firestore
@@ -163,7 +159,7 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
                       ),
                       const SizedBox(height: 18),
 
-                      // Field 2: Kategori (Satu Textbox terpadu dengan Dropdown 5 Riwayat)
+                      // Field 2: Kategori (Satu Textbox terpadu dengan Dropdown Kategori Firestore)
                       const Text(
                         'Kategori Barang',
                         style: TextStyle(
@@ -176,8 +172,6 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
                       ValueListenableBuilder<List<String>>(
                         valueListenable: BarangService().categoriesNotifier,
                         builder: (context, categories, _) {
-                          final recent5 = categories.take(5).toList();
-
                           return TextFormField(
                             controller: _categoryController,
                             style: const TextStyle(
@@ -189,7 +183,7 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
                                     ? 'Kategori barang wajib diisi'
                                     : null,
                             decoration: InputDecoration(
-                              hintText: 'Ketik atau pilih riwayat kategori...',
+                              hintText: 'Ketik atau pilih kategori...',
                               hintStyle: const TextStyle(
                                 color: textDim,
                                 fontSize: 12,
@@ -215,7 +209,7 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
                                 horizontal: 14,
                                 vertical: 12,
                               ),
-                              suffixIcon: recent5.isEmpty
+                              suffixIcon: categories.isEmpty
                                   ? null
                                   : PopupMenuButton<String>(
                                       icon: const Icon(
@@ -233,8 +227,7 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
                                           width: 1.2,
                                         ),
                                       ),
-                                      tooltip:
-                                          'Pilih dari 5 riwayat kategori',
+                                      tooltip: 'Pilih kategori',
                                       onSelected: (cat) {
                                         setState(() {
                                           _categoryController.text = cat;
@@ -246,7 +239,7 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
                                             enabled: false,
                                             height: 28,
                                             child: Text(
-                                              'RIWAYAT KATEGORI TERAKHIR',
+                                              'DAFTAR KATEGORI',
                                               style: TextStyle(
                                                 color: textDim,
                                                 fontSize: 10,
@@ -256,14 +249,14 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
                                             ),
                                           ),
                                           const PopupMenuDivider(height: 1),
-                                          ...recent5.map(
+                                          ...categories.map(
                                             (cat) => PopupMenuItem<String>(
                                               value: cat,
                                               height: 38,
                                               child: Row(
                                                 children: [
                                                   const Icon(
-                                                    Icons.history_rounded,
+                                                    Icons.category_rounded,
                                                     color: textDim,
                                                     size: 16,
                                                   ),

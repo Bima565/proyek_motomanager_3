@@ -88,12 +88,98 @@ class _DataBarangPageState extends State<DataBarangPage> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
+              final itemCat = item.category.trim();
               await BarangService().deleteBarang(item.id);
               if (mounted) {
+                final catStillExists = BarangService().categories.any(
+                      (c) => c.toLowerCase() == itemCat.toLowerCase(),
+                    ) ||
+                    BarangService().barangs.any(
+                      (b) => b.category.trim().toLowerCase() == itemCat.toLowerCase(),
+                    );
+                if (!catStillExists && _selectedCategory.toLowerCase() == itemCat.toLowerCase()) {
+                  setState(() => _selectedCategory = 'Semua');
+                }
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     backgroundColor: const Color(0xFF3B1517),
                     content: Text('Barang "${item.name}" berhasil dihapus'),
+                  ),
+                );
+              }
+            },
+            child: const Text(
+              'Hapus',
+              style: TextStyle(
+                color: textWhite,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteCategory(String category) {
+    if (category.toLowerCase() == 'semua') return;
+
+    final barangsWithCat = BarangService().barangs.where(
+      (b) => b.category.trim().toLowerCase() == category.toLowerCase(),
+    ).toList();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: cardBorder),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: accentRed, size: 22),
+            SizedBox(width: 8),
+            Text(
+              'Hapus Kategori',
+              style: TextStyle(
+                color: textWhite,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          barangsWithCat.isEmpty
+              ? 'Apakah Anda yakin ingin menghapus kategori "$category" dari database Firebase?'
+              : 'Apakah Anda yakin ingin menghapus kategori "$category" dari database Firebase?\n\nTerdapat ${barangsWithCat.length} barang pada kategori ini. Kategori barang tersebut akan diubah menjadi "Lainnya".',
+          style: const TextStyle(color: textMuted, fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal', style: TextStyle(color: textDim)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentRed,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await BarangService().deleteCategory(category);
+              if (mounted) {
+                if (_selectedCategory.toLowerCase() == category.toLowerCase()) {
+                  setState(() => _selectedCategory = 'Semua');
+                }
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: const Color(0xFF143322),
+                    content: Text('Kategori "$category" berhasil dihapus dari Firebase'),
                   ),
                 );
               }
@@ -134,73 +220,86 @@ class _DataBarangPageState extends State<DataBarangPage> {
     return ValueListenableBuilder<List<BarangModel>>(
       valueListenable: BarangService().barangsNotifier,
       builder: (context, barangs, _) {
-        // Ambil kategori unik HANYA dari barang yang sudah ditambahkan
-        final activeCategories = <String>['Semua'];
-        for (final item in barangs) {
-          final cat = item.category.trim();
-          if (cat.isNotEmpty &&
-              !activeCategories.any((c) => c.toLowerCase() == cat.toLowerCase())) {
-            activeCategories.add(cat);
-          }
-        }
+        return ValueListenableBuilder<List<String>>(
+          valueListenable: BarangService().categoriesNotifier,
+          builder: (context, registeredCategories, _) {
+            // Urutan kategori berdasarkan sequence dari Firestore (categoriesNotifier)
+            final activeCategories = <String>['Semua'];
+            for (final cat in registeredCategories) {
+              final trimmed = cat.trim();
+              if (trimmed.isNotEmpty &&
+                  !activeCategories.any((c) => c.toLowerCase() == trimmed.toLowerCase())) {
+                activeCategories.add(trimmed);
+              }
+            }
+            // Tambahkan juga jika ada kategori dari barang yang belum terdaftar di categoriesNotifier
+            for (final item in barangs) {
+              final cat = item.category.trim();
+              if (cat.isNotEmpty &&
+                  !activeCategories.any((c) => c.toLowerCase() == cat.toLowerCase())) {
+                activeCategories.add(cat);
+              }
+            }
 
-        // Sinkronisasi kategori terpilih: jika kategori yang dipilih tidak ada di barang, fallback ke 'Semua'
-        final effectiveCategory = activeCategories.any((c) => c.toLowerCase() == _selectedCategory.toLowerCase())
-            ? _selectedCategory
-            : 'Semua';
+            // Sinkronisasi kategori terpilih: jika kategori yang dipilih tidak ada di barang/kategori, fallback ke 'Semua'
+            final effectiveCategory = activeCategories.any((c) => c.toLowerCase() == _selectedCategory.toLowerCase())
+                ? _selectedCategory
+                : 'Semua';
 
-        final filtered = barangs.where((item) {
-          final matchCategory = effectiveCategory == 'Semua' ||
-              item.category.trim().toLowerCase() == effectiveCategory.toLowerCase();
-          final matchQuery = _searchController.text.isEmpty ||
-              item.name.toLowerCase().contains(_searchController.text.toLowerCase()) ||
-              item.category.toLowerCase().contains(_searchController.text.toLowerCase());
-          return matchCategory && matchQuery;
-        }).toList();
+            final filtered = barangs.where((item) {
+              final matchCategory = effectiveCategory == 'Semua' ||
+                  item.category.trim().toLowerCase() == effectiveCategory.toLowerCase();
+              final matchQuery = _searchController.text.isEmpty ||
+                  item.name.toLowerCase().contains(_searchController.text.toLowerCase()) ||
+                  item.category.toLowerCase().contains(_searchController.text.toLowerCase());
+              return matchCategory && matchQuery;
+            }).toList();
 
-        final totalKritis = barangs.where((s) => s.isCritical || s.isWarning).length;
+            final totalKritis = barangs.where((s) => s.isCritical || s.isWarning).length;
 
-        return Scaffold(
-          backgroundColor: bgDark,
-          body: SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                // 1. Header (Tombol Kembali, Judul, Subjudul)
-                _buildHeader(barangs.length, totalKritis),
+            return Scaffold(
+              backgroundColor: bgDark,
+              body: SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    // 1. Header (Tombol Kembali, Judul, Subjudul)
+                    _buildHeader(barangs.length, totalKritis),
 
-                // 2. Search Bar
-                _buildSearchBar(),
+                    // 2. Search Bar
+                    _buildSearchBar(),
 
-                // 3. Filter Kategori Chips
-                _buildCategoryFilter(activeCategories, effectiveCategory),
+                    // 3. Filter Kategori Chips
+                    _buildCategoryFilter(activeCategories, effectiveCategory),
 
-                // 4. Daftar Barang Cards
-                Expanded(
-                  child: filtered.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'Tidak ada barang yang sesuai.',
-                            style: TextStyle(color: textDim, fontSize: 13),
-                          ),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            return _buildBarangCard(filtered[index]);
-                          },
-                        ),
+                    // 4. Daftar Barang Cards
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'Tidak ada barang yang sesuai.',
+                                style: TextStyle(color: textDim, fontSize: 13),
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, _) => const SizedBox(height: 12),
+                              itemBuilder: (context, index) {
+                                return _buildBarangCard(filtered[index]);
+                              },
+                            ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          floatingActionButton: _buildFab(),
-          bottomNavigationBar: MotoBottomNav(
-            currentIndex: 2,
-            userData: widget.userData,
-          ),
+              ),
+              floatingActionButton: _buildFab(),
+              bottomNavigationBar: MotoBottomNav(
+                currentIndex: 2,
+                userData: widget.userData,
+              ),
+            );
+          },
         );
       },
     );
@@ -317,14 +416,23 @@ class _DataBarangPageState extends State<DataBarangPage> {
         itemBuilder: (context, index) {
           final cat = categories[index];
           final isSelected = cat.toLowerCase() == effectiveCategory.toLowerCase();
+          final isSemua = cat.toLowerCase() == 'semua';
 
           return GestureDetector(
             onTap: () {
               setState(() => _selectedCategory = cat);
             },
+            onLongPress: () {
+              if (!isSemua) {
+                _confirmDeleteCategory(cat);
+              }
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: EdgeInsets.symmetric(
+                horizontal: isSelected && !isSemua ? 10 : 14,
+                vertical: 6,
+              ),
               decoration: BoxDecoration(
                 color: isSelected ? accentRed : cardBg,
                 borderRadius: BorderRadius.circular(20),
@@ -333,15 +441,37 @@ class _DataBarangPageState extends State<DataBarangPage> {
                   width: 1,
                 ),
               ),
-              child: Center(
-                child: Text(
-                  cat,
-                  style: TextStyle(
-                    color: isSelected ? textWhite : textMuted,
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    cat,
+                    style: TextStyle(
+                      color: isSelected ? textWhite : textMuted,
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    ),
                   ),
-                ),
+                  if (isSelected && !isSemua) ...[
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _confirmDeleteCategory(cat),
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 13,
+                          color: textWhite,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           );
