@@ -859,61 +859,85 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '${trx.code} • ${trx.timeFormatted}',
-                      style: const TextStyle(
-                        color: textDim,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  trx.code,
+                                  style: const TextStyle(
+                                    color: textWhite,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              // Badge Status (Belum Selesai vs Lunas)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isBelumSelesai
+                                      ? const Color(0xFF2E1C14)
+                                      : const Color(0xFF0F2E1E),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: isBelumSelesai
+                                        ? const Color(0xFFB45309)
+                                        : const Color(0xFF166534),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  trx.status,
+                                  style: TextStyle(
+                                    color: isBelumSelesai ? const Color(0xFFF59E0B) : accentGreen,
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isQris ? const Color(0xFF0C243B) : const Color(0xFF161E2E),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: isQris ? const Color(0xFF1E40AF) : cardBorder,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  trx.paymentMethod,
+                                  style: TextStyle(
+                                    color: isQris ? accentBlue : textMuted,
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            trx.timeFormatted,
+                            style: const TextStyle(
+                              color: textDim,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Badge Status (Belum Selesai vs Lunas)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: isBelumSelesai
-                            ? const Color(0xFF2E1C14)
-                            : const Color(0xFF0F2E1E),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: isBelumSelesai
-                              ? const Color(0xFFB45309)
-                              : const Color(0xFF166534),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        trx.status,
-                        style: TextStyle(
-                          color: isBelumSelesai ? const Color(0xFFF59E0B) : accentGreen,
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: isQris ? const Color(0xFF0C243B) : const Color(0xFF161E2E),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: isQris ? const Color(0xFF1E40AF) : cardBorder,
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        trx.paymentMethod,
-                        style: TextStyle(
-                          color: isQris ? accentBlue : textMuted,
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
                     Text(
                       _formatRupiah(trx.totalBayar),
                       style: const TextStyle(
@@ -988,33 +1012,43 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '${item.code} • ${item.dateFormatted}',
-                      style: const TextStyle(
-                        color: textDim,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '${item.code} • ${item.dateFormatted}',
+                              style: const TextStyle(
+                                color: textDim,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFF334155), width: 1),
+                            ),
+                            child: Text(
+                              item.status,
+                              style: const TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFF334155), width: 1),
-                      ),
-                      child: Text(
-                        item.status,
-                        style: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
                     Text(
                       _formatRupiah(item.totalAmount),
                       style: const TextStyle(

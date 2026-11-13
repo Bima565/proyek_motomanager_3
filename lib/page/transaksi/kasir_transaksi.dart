@@ -5,6 +5,7 @@ import '../../services/jasa_service.dart';
 import '../../services/barang_service.dart';
 import '../../services/transaksi_service.dart';
 import '../kelola_stok_jasa.dart';
+import 'nota_pembayaran.dart';
 
 // Alias backward compatibility
 typedef KasirItemModel = TransaksiItemModel;
@@ -832,8 +833,16 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
       ),
     );
 
-    // Langsung kembali ke tampilan awal menu transaksi
-    Navigator.pop(context);
+    // Buka halaman Nota Pembayaran
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NotaPembayaranPage(
+          transaksi: completedTrx,
+          userData: widget.userData,
+        ),
+      ),
+    );
   }
 
   InputDecoration _buildInputDecoration(String hint, {String? prefix}) {
@@ -1034,6 +1043,8 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 2),
               Text(
@@ -1043,6 +1054,8 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -1286,15 +1299,19 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    Text(
-                      _formatRupiah(item.total),
-                      style: const TextStyle(
-                        color: accentGreen,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
+                    Flexible(
+                      child: Text(
+                        _formatRupiah(item.total),
+                        style: const TextStyle(
+                          color: accentGreen,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: 8),
                     // Tombol Kontrol Qty (-)
                     GestureDetector(
                       onTap: () {
