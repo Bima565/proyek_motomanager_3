@@ -5,6 +5,7 @@ import '../../services/jasa_service.dart';
 import '../../services/barang_service.dart';
 import '../../services/transaksi_service.dart';
 import '../kelola_stok_jasa.dart';
+import 'halaman_qris.dart';
 import 'nota_pembayaran.dart';
 
 // Alias backward compatibility
@@ -821,6 +822,20 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
       status: 'Lunas',
     );
 
+    // Jika metode pembayaran QRIS: Tampilkan Halaman QRIS untuk scan & konfirmasi pelanggan
+    if (_paymentMethod == 'QRIS') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HalamanQrisPage(
+            transaksi: completedTrx,
+            userData: widget.userData,
+          ),
+        ),
+      );
+      return;
+    }
+
     // Simpan ke TransaksiService (Cloud Firestore + Local state) & potong stok barang
     await TransaksiService().saveTransaksi(completedTrx);
 
@@ -1010,7 +1025,9 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                         elevation: 0,
                       ),
                       child: Text(
-                        'Proses Pembayaran (${_formatRupiah(_totalBayar)})',
+                        _paymentMethod == 'QRIS'
+                            ? 'Lanjut Pembayaran QRIS (${_formatRupiah(_totalBayar)})'
+                            : 'Proses Pembayaran (${_formatRupiah(_totalBayar)})',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,

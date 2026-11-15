@@ -82,6 +82,7 @@ flutter:
   assets:
     - assets/logo/
     - assets/nav/
+    - assets/qrris/
     - .env
     - .env.example
 
