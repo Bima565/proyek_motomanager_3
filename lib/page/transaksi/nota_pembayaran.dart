@@ -259,7 +259,51 @@ class _NotaPembayaranPageState extends State<NotaPembayaranPage> {
             ),
             const SizedBox(height: 18),
 
-            // Opsi 1: Kirim Gambar PNG Nota + Rincian via WhatsApp
+            // Opsi 1 (Jika ada nomor): Langsung Chat WhatsApp ke Nomor Pembeli (Tanpa popup berbagi)
+            if (hasPhone) ...[
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFF166534), width: 1.5),
+                ),
+                tileColor: const Color(0xFF0F2B1D),
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF16A34A),
+                  child: Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 20),
+                ),
+                title: Text(
+                  'Chat Langsung ke WhatsApp (+$cleanPhone)',
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text(
+                  'Langsung buka chat WhatsApp pembeli dengan nota teks lengkap',
+                  style: TextStyle(color: Colors.white70, fontSize: 10.5),
+                ),
+                trailing: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final waUri = Uri.parse(
+                    'https://wa.me/$cleanPhone?text=${Uri.encodeComponent(invoiceText)}',
+                  );
+                  if (await canLaunchUrl(waUri)) {
+                    await launchUrl(waUri, mode: LaunchMode.externalApplication);
+                  } else {
+                    Clipboard.setData(ClipboardData(text: invoiceText));
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        backgroundColor: Color(0xFF142033),
+                        content: Text('Teks nota telah disalin ke Clipboard!'),
+                      ),
+                    );
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+
+            // Opsi 2: Bagikan Gambar Nota PNG (Menu Berbagi Gambar Android)
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
               shape: RoundedRectangleBorder(
@@ -268,18 +312,18 @@ class _NotaPembayaranPageState extends State<NotaPembayaranPage> {
               ),
               tileColor: const Color(0xFF10131B),
               leading: const CircleAvatar(
-                backgroundColor: Color(0xFF0F2B1D),
+                backgroundColor: Color(0xFF1E2330),
                 child: Icon(Icons.image_rounded, color: accentGreen, size: 20),
               ),
               title: const Text(
-                'Kirim Gambar Nota (PNG) ke WA',
-                style: TextStyle(color: textWhite, fontSize: 13, fontWeight: FontWeight.bold),
+                'Bagikan Gambar Nota PNG (Menu Berbagi)',
+                style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
               ),
               subtitle: const Text(
-                'Bagikan foto struk digital PNG resmi + caption teks',
-                style: TextStyle(color: textDim, fontSize: 10.5),
+                'Kirim file gambar struk digital PNG via menu Berbagi Gambar Android',
+                style: TextStyle(color: Colors.white70, fontSize: 10.5),
               ),
-              trailing: const Icon(Icons.chevron_right_rounded, color: textDim),
+              trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white70),
               onTap: () async {
                 Navigator.pop(ctx);
                 if (pngFile != null) {
@@ -299,50 +343,6 @@ class _NotaPembayaranPageState extends State<NotaPembayaranPage> {
               },
             ),
             const SizedBox(height: 10),
-
-            // Opsi 2: Buka Chat Langsung ke Nomor WhatsApp Pelanggan
-            if (hasPhone) ...[
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: cardBorder),
-                ),
-                tileColor: const Color(0xFF10131B),
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFF102A1E),
-                  child: Icon(Icons.send_rounded, color: waGreen, size: 20),
-                ),
-                title: Text(
-                  'Chat WhatsApp (+$cleanPhone)',
-                  style: const TextStyle(color: textWhite, fontSize: 13, fontWeight: FontWeight.bold),
-                ),
-                subtitle: const Text(
-                  'Buka chat langsung dengan teks rincian nota siap kirim',
-                  style: TextStyle(color: textDim, fontSize: 10.5),
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded, color: textDim),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final waUri = Uri.parse(
-                    'https://wa.me/$cleanPhone?text=${Uri.encodeComponent(invoiceText)}',
-                  );
-                  if (await canLaunchUrl(waUri)) {
-                    await launchUrl(waUri, mode: LaunchMode.externalApplication);
-                  } else {
-                    Clipboard.setData(ClipboardData(text: invoiceText));
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        backgroundColor: Color(0xFF142033),
-                        content: Text('Teks disalin ke Clipboard! Silakan buka WhatsApp pelanggan.'),
-                      ),
-                    );
-                  }
-                },
-              ),
-              const SizedBox(height: 10),
-            ],
 
             // Opsi 3: Salin Teks Nota
             ListTile(

@@ -197,9 +197,6 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                                             data['Nama']?.toString() ?? data['nama']?.toString() ?? 'Pelanggan';
                                         final nomor =
                                             data['Nomor']?.toString() ?? data['nomor']?.toString() ?? '-';
-                                        final motor = data['Motor']?.toString() ??
-                                            data['Kendaraan']?.toString() ??
-                                            '';
 
                                         return ListTile(
                                           contentPadding:
@@ -223,7 +220,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                                             ),
                                           ),
                                           subtitle: Text(
-                                            nomor + (motor.isNotEmpty ? ' • $motor' : ''),
+                                            nomor,
                                             style: const TextStyle(color: Colors.white70, fontSize: 11),
                                           ),
                                           trailing: const Icon(
@@ -235,9 +232,6 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                                             setState(() {
                                               _customerName = nama;
                                               _customerPhone = nomor;
-                                              if (motor.isNotEmpty) {
-                                                _vehicleInfo = motor;
-                                              }
                                             });
                                             Navigator.pop(bottomSheetCtx);
                                             ScaffoldMessenger.of(context).showSnackBar(
@@ -1189,8 +1183,6 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
           await FirebaseFirestore.instance.collection('Pembeli').add({
             'Nama': _customerName,
             'Nomor': _customerPhone,
-            'Motor': _vehicleInfo,
-            'createdAt': FieldValue.serverTimestamp(),
           });
         }
       }
