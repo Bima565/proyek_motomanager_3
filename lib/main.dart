@@ -7,13 +7,18 @@ import 'page/login.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load konfigurasi API key dari .env atau compile-time environment
-  await DefaultFirebaseOptions.loadEnv();
+  try {
+    // Load konfigurasi API key dari .env atau compile-time environment
+    await DefaultFirebaseOptions.loadEnv();
 
-  // Inisialisasi Firebase dengan konfigurasi multi-platform (Android, Web, dll.)
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+    // Inisialisasi Firebase dengan konfigurasi multi-platform (Android, Web, dll.)
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e, stack) {
+    debugPrint('Firebase.initializeApp error: $e');
+    debugPrint('$stack');
+  }
 
   // Mengatur warna status bar sistem agar serasi dengan dark background MotoManage
   SystemChrome.setSystemUIOverlayStyle(

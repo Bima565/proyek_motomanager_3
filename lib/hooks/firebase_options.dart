@@ -7,10 +7,14 @@ import 'package:flutter/services.dart' show rootBundle;
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 class DefaultFirebaseOptions {
-  static String _webApiKey =
-      const String.fromEnvironment('FIREBASE_WEB_API_KEY');
-  static String _androidApiKey =
-      const String.fromEnvironment('FIREBASE_ANDROID_API_KEY');
+  static String _webApiKey = const String.fromEnvironment(
+    'FIREBASE_WEB_API_KEY',
+    defaultValue: 'AIzaSyCZ-KKFgRuSJ51wIBcHvTXiOxreWf4BI0g',
+  );
+  static String _androidApiKey = const String.fromEnvironment(
+    'FIREBASE_ANDROID_API_KEY',
+    defaultValue: 'AIzaSyBXYm6bPIM1vQ5aCj2jlMu__vmoOZSQRP0',
+  );
   static bool _isLoaded = false;
 
   /// Membaca konfigurasi API key dari .env atau compile-time environment
