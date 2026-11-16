@@ -668,7 +668,6 @@ class _DataBarangPageState extends State<DataBarangPage> {
     final nameCtrl = TextEditingController(text: item.name);
     final buyPriceCtrl = TextEditingController(text: formatRibuan(item.buyPrice));
     final sellPriceCtrl = TextEditingController(text: formatRibuan(item.sellPrice));
-    final stockCtrl = TextEditingController(text: item.stock.toString());
     String selectedCat = item.category;
 
     final barangs = BarangService().barangsNotifier.value;
@@ -788,62 +787,37 @@ class _DataBarangPageState extends State<DataBarangPage> {
                 ],
               ),
               const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Kategori Barang', style: TextStyle(color: textMuted, fontSize: 11)),
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          decoration: BoxDecoration(
-                            color: bgDark,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: cardBorder),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: selectedCat,
-                              isExpanded: true,
-                              dropdownColor: cardBg,
-                              icon: const Icon(Icons.keyboard_arrow_down, color: textDim, size: 18),
-                              style: const TextStyle(color: textWhite, fontSize: 12),
-                              items: availableCats
-                                  .map((c) => DropdownMenuItem(
-                                        value: c,
-                                        child: Text(c),
-                                      ))
-                                  .toList(),
-                              onChanged: (val) {
-                                if (val != null) {
-                                  setModalState(() => selectedCat = val);
-                                }
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+              const SizedBox(height: 10),
+              const Text('Kategori Barang', style: TextStyle(color: textMuted, fontSize: 11)),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: bgDark,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: cardBorder),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: selectedCat,
+                    isExpanded: true,
+                    dropdownColor: cardBg,
+                    icon: const Icon(Icons.keyboard_arrow_down, color: textDim, size: 18),
+                    style: const TextStyle(color: textWhite, fontSize: 12),
+                    items: availableCats
+                        .map((c) => DropdownMenuItem(
+                              value: c,
+                              child: Text(c),
+                            ))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setModalState(() => selectedCat = val);
+                      }
+                    },
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Jumlah Stok', style: TextStyle(color: textMuted, fontSize: 11)),
-                        const SizedBox(height: 4),
-                        TextField(
-                          controller: stockCtrl,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(color: textWhite, fontSize: 13),
-                          decoration: _buildInputDeco('0', suffix: item.unit),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
               const SizedBox(height: 16),
               Row(
@@ -870,7 +844,6 @@ class _DataBarangPageState extends State<DataBarangPage> {
                         if (n.isEmpty) return;
                         final buy = int.tryParse(buyPriceCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? item.buyPrice;
                         final sell = int.tryParse(sellPriceCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? item.sellPrice;
-                        final st = int.tryParse(stockCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? item.stock;
 
                         final updated = BarangModel(
                           id: item.id,
@@ -878,7 +851,7 @@ class _DataBarangPageState extends State<DataBarangPage> {
                           category: selectedCat,
                           buyPrice: buy,
                           sellPrice: sell,
-                          stock: st,
+                          stock: item.stock,
                           unit: item.unit,
                           lastUpdated: 'Diedit ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
                         );
