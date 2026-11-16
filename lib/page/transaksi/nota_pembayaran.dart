@@ -47,7 +47,6 @@ class _NotaPembayaranPageState extends State<NotaPembayaranPage> {
   static const Color bgDark = Color(0xFF0E1015);
   static const Color cardBg = Color(0xFF151821);
   static const Color cardBorder = Color(0xFF222634);
-  static const Color accentRed = Color(0xFFFF1E27);
   static const Color accentGreen = Color(0xFF22C55E);
   static const Color waGreen = Color(0xFF16A34A);
   static const Color textWhite = Color(0xFFFFFFFF);
@@ -382,148 +381,7 @@ class _NotaPembayaranPageState extends State<NotaPembayaranPage> {
     );
   }
 
-  void _printReceiptPdf(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: cardBg,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: cardBorder),
-        ),
-        title: Row(
-          children: const [
-            Icon(Icons.receipt_rounded, color: accentRed, size: 22),
-            SizedBox(width: 10),
-            Text(
-              'Cetak Struk Thermal (PDF)',
-              style: TextStyle(
-                color: textWhite,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFFFFF),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: DefaultTextStyle(
-                style: const TextStyle(
-                  color: Color(0xFF1E293B),
-                  fontSize: 10,
-                  fontFamily: 'monospace',
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'BENGKEL ZALZABILA MOTOR',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text('Jl. Raya Industri No. 45'),
-                    const Text('Telp/WA: 0812-3456-7890'),
-                    const Text('================================='),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('No: $effectiveNoNota'),
-                        Text(effectivePaymentMethod),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Kasir: $effectiveKasir'),
-                        Text(effectiveWaktu.split('•').first.trim()),
-                      ],
-                    ),
-                    const Text('---------------------------------'),
-                    ...effectiveItems.map((i) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  '${i.name} (${i.quantity}x)',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              Text(_formatRupiah(i.total)),
-                            ],
-                          ),
-                        )),
-                    const Text('---------------------------------'),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('TOTAL:', style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text(_formatRupiah(effectiveTotalBayar),
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const Text('================================='),
-                    const Text('TERIMA KASIH'),
-                    const Text('GARANSI SERVIS 7 HARI'),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal', style: TextStyle(color: textDim)),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: accentRed,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  backgroundColor: const Color(0xFF142033),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: const BorderSide(color: Color(0xFF1E3A8A), width: 1),
-                  ),
-                  content: Row(
-                    children: const [
-                      Icon(Icons.print_rounded, color: Color(0xFF38BDF8), size: 20),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Struk nota siap dicetak ke printer POS!',
-                          style: TextStyle(color: textWhite, fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.print_rounded, color: textWhite, size: 16),
-            label: const Text('Cetak Sekarang', style: TextStyle(color: textWhite)),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -843,32 +701,7 @@ class _NotaPembayaranPageState extends State<NotaPembayaranPage> {
               ),
               const SizedBox(height: 12),
 
-              // 4. Tombol Cetak Struk (PDF)
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () => _printReceiptPdf(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accentRed,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Cetak Struk (PDF)',
-                    style: TextStyle(
-                      color: textWhite,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // 5. Tombol Kembali
+              // 4. Tombol Kembali
               SizedBox(
                 width: double.infinity,
                 height: 48,

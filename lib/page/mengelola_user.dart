@@ -198,7 +198,7 @@ class _MengelolaUserPageState extends State<MengelolaUserPage> {
           actions: [
             TextButton(
               onPressed: isLoading ? null : () => Navigator.pop(ctx),
-              child: const Text('Batal', style: TextStyle(color: textDim)),
+              child: const Text('Batal', style: TextStyle(color: Colors.white70)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -400,7 +400,7 @@ class _MengelolaUserPageState extends State<MengelolaUserPage> {
           actions: [
             TextButton(
               onPressed: isLoading ? null : () => Navigator.pop(ctx),
-              child: const Text('Batal', style: TextStyle(color: textDim)),
+              child: const Text('Batal', style: TextStyle(color: Colors.white70)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -490,12 +490,12 @@ class _MengelolaUserPageState extends State<MengelolaUserPage> {
                 color: textWhite, fontWeight: FontWeight.bold, fontSize: 16)),
         content: Text(
           'Apakah Anda yakin ingin menghapus pengguna $name dari database Firebase?',
-          style: const TextStyle(color: textMuted, fontSize: 13.5),
+          style: const TextStyle(color: Colors.white, fontSize: 13.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal', style: TextStyle(color: textDim)),
+            child: const Text('Batal', style: TextStyle(color: Colors.white70)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(

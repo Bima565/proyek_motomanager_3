@@ -89,12 +89,12 @@ class _MasterJasaPageState extends State<MasterJasaPage> {
         ),
         content: Text(
           'Apakah Anda yakin ingin menghapus layanan "${item.name}"? Data yang dihapus tidak dapat dikembalikan.',
-          style: const TextStyle(color: textMuted, fontSize: 13),
+          style: const TextStyle(color: Colors.white, fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal', style: TextStyle(color: textDim)),
+            child: const Text('Batal', style: TextStyle(color: Colors.white70)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(

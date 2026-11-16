@@ -71,12 +71,12 @@ class _DataBarangPageState extends State<DataBarangPage> {
         ),
         content: Text(
           'Apakah Anda yakin ingin menghapus barang "${item.name}"? Data yang dihapus tidak dapat dikembalikan.',
-          style: const TextStyle(color: textMuted, fontSize: 13),
+          style: const TextStyle(color: Colors.white, fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal', style: TextStyle(color: textDim)),
+            child: const Text('Batal', style: TextStyle(color: Colors.white70)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -154,12 +154,12 @@ class _DataBarangPageState extends State<DataBarangPage> {
           barangsWithCat.isEmpty
               ? 'Apakah Anda yakin ingin menghapus kategori "$category" dari database Firebase?'
               : 'Apakah Anda yakin ingin menghapus kategori "$category" dari database Firebase?\n\nTerdapat ${barangsWithCat.length} barang pada kategori ini. Kategori barang tersebut akan diubah menjadi "Lainnya".',
-          style: const TextStyle(color: textMuted, fontSize: 13, height: 1.4),
+          style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal', style: TextStyle(color: textDim)),
+            child: const Text('Batal', style: TextStyle(color: Colors.white70)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(

@@ -41,7 +41,7 @@ class _LoginPageState extends State<LoginPage> {
   void initState() {
     super.initState();
     _emailController = TextEditingController(
-      text: widget.initialEmail ?? 'example@gmail.com',
+      text: widget.initialEmail ?? '',
     );
   }
 
@@ -636,7 +636,7 @@ class _LoginPageState extends State<LoginPage> {
                       style: const TextStyle(color: textWhite, fontSize: 14),
                       keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
-                        hintText: 'sugeng@motomanage.id',
+                        hintText: 'Masukan Email',
                         hintStyle: const TextStyle(color: textDim, fontSize: 13.5),
                         prefixIcon: const Icon(
                           Icons.mail_outline_rounded,
@@ -745,8 +745,8 @@ class _LoginPageState extends State<LoginPage> {
                       obscureText: _obscurePassword,
                       style: const TextStyle(color: textWhite, fontSize: 14),
                       decoration: InputDecoration(
-                        hintText: '••••••••••',
-                        hintStyle: const TextStyle(color: textDim, fontSize: 16),
+                        hintText: 'Masukan Password',
+                        hintStyle: const TextStyle(color: textDim, fontSize: 13.5),
                         prefixIcon: const Icon(
                           Icons.lock_outline_rounded,
                           color: textDim,

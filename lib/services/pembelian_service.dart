@@ -212,6 +212,32 @@ class PembelianService {
     }
   }
 
+  /// Hapus riwayat transaksi pembelian dan rollback (kurangi kembali) stok barang terkait
+  Future<void> deletePembelian(PembelianRecord pembelian) async {
+    // 1. Rollback stok barang: kurangi stok fisik sejumlah quantity yang dulu dibeli
+    for (final item in pembelian.items) {
+      await BarangService().adjustStock(item.name, -item.quantity);
+    }
+
+    // 2. Hapus dari reactive state lokal
+    final list = List<PembelianRecord>.from(pembelianNotifier.value);
+    list.removeWhere(
+      (p) => p.code == pembelian.code || (pembelian.id.isNotEmpty && p.id == pembelian.id),
+    );
+    pembelianNotifier.value = list;
+
+    // 3. Hapus dokumen di Firestore
+    try {
+      final docId = pembelian.id.isNotEmpty ? pembelian.id : pembelian.code;
+      await _firestore.collection('transaksi_pembelian').doc(docId).delete();
+      if (pembelian.code.isNotEmpty && pembelian.code != docId) {
+        await _firestore.collection('transaksi_pembelian').doc(pembelian.code).delete();
+      }
+    } catch (e) {
+      debugPrint('Firestore deletePembelian failed: $e');
+    }
+  }
+
   int getMonthlyExpense({int? year, int? month}) {
     final now = DateTime.now();
     final y = year ?? now.year;

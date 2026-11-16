@@ -438,7 +438,7 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Harga Modal Beli (Rp)', style: TextStyle(color: textMuted, fontSize: 11)),
+                const Text('Harga Modal Beli (Rp)', style: TextStyle(color: Colors.white, fontSize: 11)),
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -472,7 +472,7 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text('Harga Jual Toko (Rp)', style: TextStyle(color: textMuted, fontSize: 11)),
+                const Text('Harga Jual Toko (Rp)', style: TextStyle(color: Colors.white, fontSize: 11)),
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -529,7 +529,7 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Batal', style: TextStyle(color: textDim)),
+              child: const Text('Batal', style: TextStyle(color: Colors.white70)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -1018,7 +1018,7 @@ class _PengadaanRestockPageState extends State<PengadaanRestockPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Harga Jual Toko (Rp)', style: TextStyle(color: textMuted, fontSize: 11)),
+                              const Text('Harga Jual Toko (Rp)', style: TextStyle(color: Colors.white, fontSize: 11)),
                               const SizedBox(height: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12),

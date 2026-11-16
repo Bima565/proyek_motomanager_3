@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../components/back_button_circle.dart';
 import '../../components/rupiah_formatter.dart';
@@ -89,9 +90,185 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     return 0;
   }
 
+  /// Bottom Sheet untuk memilih riwayat pelanggan dari collection Firestore 'Pembeli'
+  void _showHistoryPelangganPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        side: BorderSide(color: cardBorder),
+      ),
+      builder: (bottomSheetCtx) {
+        String searchQuery = '';
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('Pembeli').snapshots(),
+              builder: (context, snapshot) {
+                final docs = snapshot.data?.docs ?? [];
+                final filtered = docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>? ?? {};
+                  final nama = (data['Nama'] ?? data['nama'] ?? '').toString().toLowerCase();
+                  final nomor = (data['Nomor'] ?? data['nomor'] ?? '').toString().toLowerCase();
+                  if (searchQuery.isEmpty) return true;
+                  final q = searchQuery.toLowerCase();
+                  return nama.contains(q) || nomor.contains(q);
+                }).toList();
+
+                return Padding(
+                  padding: EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 16,
+                    bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                  ),
+                  child: SizedBox(
+                    height: MediaQuery.of(ctx).size.height * 0.65,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.white38,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        const Row(
+                          children: [
+                            Icon(Icons.history_rounded, color: accentGreen, size: 22),
+                            SizedBox(width: 8),
+                            Text(
+                              'Riwayat Pelanggan (Firestore)',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          onChanged: (val) => setModalState(() => searchQuery = val),
+                          decoration: InputDecoration(
+                            hintText: 'Cari nama atau nomor pelanggan...',
+                            hintStyle: const TextStyle(color: Colors.white60, fontSize: 12),
+                            prefixIcon: const Icon(Icons.search, color: Colors.white70, size: 18),
+                            filled: true,
+                            fillColor: bgDark,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: cardBorder),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: cardBorder),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: snapshot.connectionState == ConnectionState.waiting
+                              ? const Center(child: CircularProgressIndicator(color: accentRed))
+                              : filtered.isEmpty
+                                  ? const Center(
+                                      child: Text(
+                                        'Belum ada data pelanggan di database',
+                                        style: TextStyle(color: Colors.white70, fontSize: 13),
+                                      ),
+                                    )
+                                  : ListView.separated(
+                                      itemCount: filtered.length,
+                                      separatorBuilder: (_, _) =>
+                                          const Divider(color: cardBorder, height: 1),
+                                      itemBuilder: (ctx, index) {
+                                        final data =
+                                            filtered[index].data() as Map<String, dynamic>? ?? {};
+                                        final nama =
+                                            data['Nama']?.toString() ?? data['nama']?.toString() ?? 'Pelanggan';
+                                        final nomor =
+                                            data['Nomor']?.toString() ?? data['nomor']?.toString() ?? '-';
+                                        final motor = data['Motor']?.toString() ??
+                                            data['Kendaraan']?.toString() ??
+                                            '';
+
+                                        return ListTile(
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                          leading: CircleAvatar(
+                                            backgroundColor: const Color(0xFF1E293B),
+                                            child: Text(
+                                              nama.isNotEmpty ? nama[0].toUpperCase() : 'P',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                          title: Text(
+                                            nama,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                          subtitle: Text(
+                                            nomor + (motor.isNotEmpty ? ' • $motor' : ''),
+                                            style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                          ),
+                                          trailing: const Icon(
+                                            Icons.check_circle_outline_rounded,
+                                            color: accentGreen,
+                                            size: 20,
+                                          ),
+                                          onTap: () {
+                                            setState(() {
+                                              _customerName = nama;
+                                              _customerPhone = nomor;
+                                              if (motor.isNotEmpty) {
+                                                _vehicleInfo = motor;
+                                              }
+                                            });
+                                            Navigator.pop(bottomSheetCtx);
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                backgroundColor: const Color(0xFF143322),
+                                                content: Text(
+                                                  'Data pelanggan "$nama" berhasil dimuat!',
+                                                  style: const TextStyle(color: Colors.white),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        );
+                                      },
+                                    ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   // Edit Data Pelanggan & Motor (Tanpa Plat Nomor)
   void _showEditCustomerDialog() {
-    final nameCtrl = TextEditingController(text: _customerName);
+    final nameCtrl = TextEditingController(text: _customerName == 'Pelanggan Umum' ? '' : _customerName);
     final vehicleCtrl = TextEditingController(text: _vehicleInfo);
     final phoneCtrl = TextEditingController(text: _customerPhone);
 
@@ -105,35 +282,68 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
         ),
         title: const Text(
           'Edit Data Pelanggan & Motor',
-          style: TextStyle(color: textWhite, fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
         ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Nama Pelanggan', style: TextStyle(color: textMuted, fontSize: 11)),
+              // Tombol Pilih dari Riwayat Pelanggan (Firestore)
+              InkWell(
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showHistoryPelangganPicker();
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF142921),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF166534)),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.history_rounded, color: accentGreen, size: 16),
+                      SizedBox(width: 8),
+                      Text(
+                        'Pilih dari Riwayat Pelanggan',
+                        style: TextStyle(
+                          color: accentGreen,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Text('Nama Pelanggan *', style: TextStyle(color: Colors.white, fontSize: 11)),
               const SizedBox(height: 6),
               TextField(
                 controller: nameCtrl,
-                style: const TextStyle(color: textWhite, fontSize: 13),
+                style: const TextStyle(color: Colors.white, fontSize: 13),
                 decoration: _buildInputDecoration('Contoh: Bpk. Budi'),
               ),
               const SizedBox(height: 12),
-              const Text('Motor / Kendaraan', style: TextStyle(color: textMuted, fontSize: 11)),
+              const Text('Motor / Kendaraan', style: TextStyle(color: Colors.white, fontSize: 11)),
               const SizedBox(height: 6),
               TextField(
                 controller: vehicleCtrl,
-                style: const TextStyle(color: textWhite, fontSize: 13),
+                style: const TextStyle(color: Colors.white, fontSize: 13),
                 decoration: _buildInputDecoration('Contoh: Honda Vario 160'),
               ),
               const SizedBox(height: 12),
-              const Text('No. WhatsApp / HP', style: TextStyle(color: textMuted, fontSize: 11)),
+              const Text('No. WhatsApp / HP *', style: TextStyle(color: Colors.white, fontSize: 11)),
               const SizedBox(height: 6),
               TextField(
                 controller: phoneCtrl,
                 keyboardType: TextInputType.phone,
-                style: const TextStyle(color: textWhite, fontSize: 13),
+                style: const TextStyle(color: Colors.white, fontSize: 13),
                 decoration: _buildInputDecoration('Contoh: 081234567890'),
               ),
             ],
@@ -142,7 +352,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal', style: TextStyle(color: textDim)),
+            child: const Text('Batal', style: TextStyle(color: Colors.white70)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -157,7 +367,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
               });
               Navigator.pop(ctx);
             },
-            child: const Text('Simpan', style: TextStyle(color: textWhite)),
+            child: const Text('Simpan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -765,8 +975,32 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     Navigator.pop(context);
   }
 
-  // Proses Pembayaran: Simpan Lunas & Langsung Kembali ke Menu Awal Transaksi
+  // Proses Pembayaran: Validasi Wajib, Konfirmasi Ulang, & Simpan Lunas
   void _handleProcessPayment() async {
+    // 1. Validasi Poin 6: Data Pembeli (Nama & No. HP) wajib diisi terlebih dahulu
+    if (_customerName.trim().isEmpty || _customerName.trim().toLowerCase() == 'pelanggan umum') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFF3B1517),
+          content: Text('Data Pembeli wajib diisi! Silakan lengkapi nama pelanggan terlebih dahulu.'),
+        ),
+      );
+      _showEditCustomerDialog();
+      return;
+    }
+
+    if (_customerPhone.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFF3B1517),
+          content: Text('Nomor WhatsApp / HP pembeli wajib diisi sebelum proses pembayaran!'),
+        ),
+      );
+      _showEditCustomerDialog();
+      return;
+    }
+
+    // 2. Validasi Keranjang Transaksi
     if (_items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -777,7 +1011,31 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
       return;
     }
 
-    // Validasi stok barang sebelum checkout
+    // 3. Validasi Poin 6: Item Barang dan Jasa Service harus diisi keduanya
+    final hasBarang = _items.any((item) => !item.isService);
+    final hasJasa = _items.any((item) => item.isService);
+
+    if (!hasBarang) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFF3B1517),
+          content: Text('Transaksi wajib memuat minimal 1 item barang (sparepart)!'),
+        ),
+      );
+      return;
+    }
+
+    if (!hasJasa) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFF3B1517),
+          content: Text('Transaksi wajib memuat minimal 1 layanan jasa servis!'),
+        ),
+      );
+      return;
+    }
+
+    // 4. Validasi stok barang sebelum checkout
     for (final item in _items) {
       if (!item.isService) {
         final currentStock = _getItemStock(item.name);
@@ -802,6 +1060,103 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
       }
     }
 
+    // 5. Validasi Poin 1 & 4: Konfirmasi Ulang pada Transaksi uang Tunai maupun QRIS (Teks Putih)
+    final bool? isConfirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: cardBorder),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              _paymentMethod == 'QRIS' ? Icons.qr_code_2_rounded : Icons.payments_rounded,
+              color: _paymentMethod == 'QRIS' ? accentBlue : accentGreen,
+              size: 24,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'Konfirmasi Pembayaran $_paymentMethod',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Apakah Anda yakin ingin memproses transaksi $_paymentMethod berikut?',
+              style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: bgDark,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: cardBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'TOTAL TAGIHAN',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatRupiah(_totalBayar),
+                    style: TextStyle(
+                      color: _paymentMethod == 'QRIS' ? accentBlue : accentGreen,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Pelanggan : $_customerName', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  Text('Kontak    : $_customerPhone', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                  if (_vehicleInfo.isNotEmpty)
+                    Text('Motor     : $_vehicleInfo', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Batal', style: TextStyle(color: Colors.white70)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _paymentMethod == 'QRIS' ? accentBlue : accentRed,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text(
+              'Ya, Lanjutkan',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (isConfirmed != true) return;
+
     final kasirName = widget.userData?['nama_lengkap'] ?? 'Kasir';
 
     final completedTrx = TransaksiPenjualanModel(
@@ -822,8 +1177,28 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
       status: 'Lunas',
     );
 
+    // Otomatis sinkronisasi/simpan pelanggan baru ke collection Firestore 'Pembeli'
+    try {
+      if (_customerName.isNotEmpty && _customerName.toLowerCase() != 'pelanggan umum') {
+        final query = await FirebaseFirestore.instance
+            .collection('Pembeli')
+            .where('Nama', isEqualTo: _customerName)
+            .limit(1)
+            .get();
+        if (query.docs.isEmpty) {
+          await FirebaseFirestore.instance.collection('Pembeli').add({
+            'Nama': _customerName,
+            'Nomor': _customerPhone,
+            'Motor': _vehicleInfo,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    } catch (_) {}
+
     // Jika metode pembayaran QRIS: Tampilkan Halaman QRIS untuk scan & konfirmasi pelanggan
     if (_paymentMethod == 'QRIS') {
+      if (!mounted) return;
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -1160,24 +1535,55 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
             ),
           ),
           const SizedBox(width: 10),
-          GestureDetector(
-            onTap: _showEditCustomerDialog,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF142033),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF1E3A8A), width: 1),
-              ),
-              child: const Text(
-                'EDIT',
-                style: TextStyle(
-                  color: Color(0xFF60A5FA),
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: _showHistoryPelangganPicker,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF142921),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF166534), width: 1),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.history_rounded, color: accentGreen, size: 13),
+                      SizedBox(width: 4),
+                      Text(
+                        'RIWAYAT',
+                        style: TextStyle(
+                          color: accentGreen,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: _showEditCustomerDialog,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF142033),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF1E3A8A), width: 1),
+                  ),
+                  child: const Text(
+                    'EDIT',
+                    style: TextStyle(
+                      color: Color(0xFF60A5FA),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

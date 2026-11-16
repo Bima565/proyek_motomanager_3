@@ -463,6 +463,18 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: () => _confirmDeletePembelian(context, item),
+                  icon: const Icon(Icons.delete_outline_rounded, color: accentRed, size: 16),
+                  label: const Text(
+                    'Hapus Riwayat Pembelian Ini',
+                    style: TextStyle(color: accentRed, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -470,6 +482,103 @@ class _RiwayatTransaksiPageState extends State<RiwayatTransaksiPage> {
     },
   );
 }
+
+  void _confirmDeletePembelian(BuildContext context, PembelianRecord item) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: cardBorder),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: accentRed, size: 22),
+            SizedBox(width: 8),
+            Text(
+              'Hapus Pembelian?',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Hapus transaksi pembelian ${item.code}?',
+              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Perhatian: Stok barang (PCS) yang dulu ditambahkan dari pembelian ini akan otomatis dikurangi kembali (rollback).',
+              style: TextStyle(color: Colors.white, fontSize: 12, height: 1.4),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: bgDark,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: cardBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: item.items
+                    .map((it) => Text(
+                          '• ${it.name}: -${it.quantity} ${it.unit}',
+                          style: const TextStyle(
+                            color: Color(0xFFF87171),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Batal', style: TextStyle(color: Colors.white70)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentRed,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              Navigator.pop(context); // Tutup bottom sheet
+              await PembelianService().deletePembelian(item);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: const Color(0xFF143322),
+                    content: Text(
+                      'Transaksi ${item.code} dihapus & stok barang berhasil di-rollback!',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                );
+              }
+            },
+            child: const Text(
+              'Hapus & Rollback Stok',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

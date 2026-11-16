@@ -67,7 +67,7 @@ class _HalamanQrisPageState extends State<HalamanQrisPage> {
             children: [
               const Text(
                 'Pastikan dana pembayaran telah berhasil masuk ke mutasi/notifikasi bengkel:',
-                style: TextStyle(color: textMuted, fontSize: 13, height: 1.4),
+                style: TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
               ),
               const SizedBox(height: 14),
               Container(
@@ -81,10 +81,10 @@ class _HalamanQrisPageState extends State<HalamanQrisPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'TOTAL PEMBAYARAN',
-                      style: const TextStyle(
-                        color: textDim,
+                      style: TextStyle(
+                        color: Colors.white70,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
@@ -102,7 +102,7 @@ class _HalamanQrisPageState extends State<HalamanQrisPage> {
                     const SizedBox(height: 6),
                     Text(
                       'Pelanggan: ${widget.transaksi.customerName}',
-                      style: const TextStyle(color: textWhite, fontSize: 12),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
                     ),
                   ],
                 ),
@@ -112,7 +112,7 @@ class _HalamanQrisPageState extends State<HalamanQrisPage> {
           actions: [
             TextButton(
               onPressed: _isProcessing ? null : () => Navigator.pop(dialogCtx),
-              child: const Text('Batal', style: TextStyle(color: textDim)),
+              child: const Text('Batal', style: TextStyle(color: Colors.white70)),
             ),
             ElevatedButton(
               onPressed: _isProcessing
@@ -362,8 +362,9 @@ class _HalamanQrisPageState extends State<HalamanQrisPage> {
       ),
       child: Column(
         children: [
-          // Frame Putih untuk Kontras Scan QRIS yang Optimal
+          // Frame Putih untuk Kontras Scan QRIS yang Optimal & Ukuran Penuh Menyesuaikan Layar
           Container(
+            width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -380,13 +381,12 @@ class _HalamanQrisPageState extends State<HalamanQrisPage> {
               borderRadius: BorderRadius.circular(8),
               child: Image.asset(
                 'assets/qrris/qris_pembayaran.jpg',
-                width: 240,
-                height: 240,
-                fit: BoxFit.contain,
+                width: double.infinity,
+                fit: BoxFit.fitWidth,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
-                    width: 240,
-                    height: 240,
+                    width: double.infinity,
+                    height: 320,
                     color: Colors.grey.shade200,
                     child: const Center(
                       child: Column(

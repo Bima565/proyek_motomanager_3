@@ -118,14 +118,14 @@ class _ProfilPageState extends State<ProfilPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Email Saat Ini', style: TextStyle(color: textMuted, fontSize: 12)),
+              const Text('Email Saat Ini', style: TextStyle(color: Colors.white, fontSize: 12)),
               const SizedBox(height: 4),
               Text(
                 currentEmail,
-                style: const TextStyle(color: textDim, fontSize: 13),
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
               const SizedBox(height: 14),
-              const Text('Email Baru', style: TextStyle(color: textMuted, fontSize: 12)),
+              const Text('Email Baru', style: TextStyle(color: Colors.white, fontSize: 12)),
               const SizedBox(height: 6),
               TextField(
                 controller: emailController,
@@ -148,7 +148,7 @@ class _ProfilPageState extends State<ProfilPage> {
           actions: [
             TextButton(
               onPressed: isLoading ? null : () => Navigator.pop(ctx),
-              child: const Text('Batal', style: TextStyle(color: textDim)),
+              child: const Text('Batal', style: TextStyle(color: Colors.white70)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -248,7 +248,7 @@ class _ProfilPageState extends State<ProfilPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Nama Lengkap', style: TextStyle(color: textMuted, fontSize: 12)),
+              const Text('Nama Lengkap', style: TextStyle(color: Colors.white, fontSize: 12)),
               const SizedBox(height: 6),
               TextField(
                 controller: nameController,
@@ -264,7 +264,7 @@ class _ProfilPageState extends State<ProfilPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Text('Nomor Telepon', style: TextStyle(color: textMuted, fontSize: 12)),
+              const Text('Nomor Telepon', style: TextStyle(color: Colors.white, fontSize: 12)),
               const SizedBox(height: 6),
               TextField(
                 controller: phoneController,
@@ -283,18 +283,18 @@ class _ProfilPageState extends State<ProfilPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Text('Email', style: TextStyle(color: textMuted, fontSize: 12)),
+              const Text('Email', style: TextStyle(color: Colors.white, fontSize: 12)),
               const SizedBox(height: 4),
               Text(
                 currentEmail,
-                style: const TextStyle(color: textDim, fontSize: 13),
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: isLoading ? null : () => Navigator.pop(ctx),
-              child: const Text('Batal', style: TextStyle(color: textDim)),
+              child: const Text('Batal', style: TextStyle(color: Colors.white70)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -375,12 +375,12 @@ class _ProfilPageState extends State<ProfilPage> {
             style: TextStyle(color: textWhite, fontWeight: FontWeight.bold, fontSize: 16)),
         content: const Text(
           'Apakah Anda yakin ingin keluar dari akun MotoManage?',
-          style: TextStyle(color: textMuted, fontSize: 13.5),
+          style: TextStyle(color: Colors.white, fontSize: 13.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal', style: TextStyle(color: textDim)),
+            child: const Text('Batal', style: TextStyle(color: Colors.white70)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
