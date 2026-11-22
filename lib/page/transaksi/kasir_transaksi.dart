@@ -375,6 +375,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
     required String subInfo,
     required int price,
     required bool isService,
+    int? buyPrice,
   }) {
     if (!isService) {
       final availableStock = _getItemStock(name);
@@ -424,6 +425,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
             price: price,
             quantity: 1,
             isService: isService,
+            buyPrice: buyPrice,
           ),
         );
       }
@@ -836,6 +838,7 @@ class _KasirTransaksiPageState extends State<KasirTransaksiPage> {
                               subInfo: 'Stok: ${item.stock} ${item.unit}',
                               price: item.sellPrice,
                               isService: false,
+                              buyPrice: item.buyPrice,
                             );
 
                             Navigator.pop(ctx);

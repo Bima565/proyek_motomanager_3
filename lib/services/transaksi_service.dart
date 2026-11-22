@@ -10,6 +10,7 @@ class TransaksiItemModel {
   int price;
   int quantity;
   bool isService;
+  int? buyPrice;
 
   TransaksiItemModel({
     required this.id,
@@ -19,6 +20,7 @@ class TransaksiItemModel {
     required this.price,
     this.quantity = 1,
     required this.isService,
+    this.buyPrice,
   });
 
   int get total => price * quantity;
@@ -32,6 +34,7 @@ class TransaksiItemModel {
       'price': price,
       'quantity': quantity,
       'isService': isService,
+      if (buyPrice != null) 'buyPrice': buyPrice,
     };
   }
 
@@ -44,6 +47,7 @@ class TransaksiItemModel {
       price: (map['price'] as num?)?.toInt() ?? 0,
       quantity: (map['quantity'] as num?)?.toInt() ?? 1,
       isService: map['isService'] == true,
+      buyPrice: (map['buyPrice'] ?? map['hargaBeli'] ?? map['modal'] as num?)?.toInt(),
     );
   }
 }
