@@ -1167,7 +1167,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
           autofocus: true,
           style: const TextStyle(color: textWhite, fontSize: 16, fontWeight: FontWeight.bold),
           decoration: InputDecoration(
-            hintText: 'Contoh: 2024',
+            hintText: 'Contoh: 2026',
             hintStyle: const TextStyle(color: textDim),
             filled: true,
             fillColor: const Color(0xFF0E1015),
@@ -1214,9 +1214,13 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
   }
 
   Widget _buildTrenLabaDropdown() {
-    final int currentYear = DateTime.now().year;
-    final List<int> defaultYears = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
-    final Set<int> allAvailableYears = {...defaultYears, _selectedTrenYear};
+    final int currentYear = DateTime.now().year; // 2026
+    final Set<int> allAvailableYears = {currentYear, _selectedTrenYear};
+    for (final t in TransaksiService().transactions) {
+      if (t.dateTime.year >= 2026) {
+        allAvailableYears.add(t.dateTime.year);
+      }
+    }
     final sortedYears = allAvailableYears.toList()..sort((a, b) => b.compareTo(a));
 
     return Container(

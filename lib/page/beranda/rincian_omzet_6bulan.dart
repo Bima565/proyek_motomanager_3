@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../components/rupiah_formatter.dart';
+import '../../services/transaksi_service.dart';
 
-/// Screen 15 - (FR09) Rincian Laporan Omzet 6 Bulan
+/// Screen 15 - (FR09) Rincian Laporan Omzet 6 Bulan (Terintegrasi Cloud Firestore)
 class RincianOmzet6BulanPage extends StatefulWidget {
   final Map<String, dynamic>? userData;
 
@@ -23,103 +25,281 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
 
   String _selectedYear = '2026';
 
+  static const List<String> _namaBulanLengkap = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
+  static const List<String> _namaBulanSingkat = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+    'Jul', 'Agu', 'Sept', 'Okt', 'Nov', 'Des'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedYear = DateTime.now().year.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgDark,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Header (Back Button, Title, Subtitle, Year Dropdown)
-              _buildHeader(),
-              const SizedBox(height: 16),
+        child: AnimatedBuilder(
+          animation: TransaksiService().transactionsNotifier,
+          builder: (context, _) {
+            final allTrx = TransaksiService().transactions;
+            final validTrx = allTrx.where((t) => t.status.toLowerCase() != 'batal').toList();
 
-              // 2. Card Total Akumulasi Omzet (6 Bulan)
-              _buildAkumulasiCard(),
-              const SizedBox(height: 16),
+            final int selectedYearInt = int.tryParse(_selectedYear) ?? DateTime.now().year;
 
-              // 3. List Kartu Bulan-Bulan
-              _buildMonthCard(
-                month: 'September 2026',
-                omzet: 'Rp 2.750.000',
-                comparison: '▲ +7.8% vs Agu',
-                isPositive: true,
-                isHighlight: true,
-                servisText: 'Servis: Rp 1.240.000 (45%)',
-                partText: 'Part: Rp 1.510.000 (55%)',
-                servisRatio: 0.45,
+            // Kumpulkan daftar tahun yang tersedia (aplikasi dimulai dari tahun 2026)
+            final now = DateTime.now();
+            final Set<String> availableYears = {
+              now.year.toString(), // 2026
+            };
+            for (final t in validTrx) {
+              if (t.dateTime.year >= 2026) {
+                availableYears.add(t.dateTime.year.toString());
+              }
+            }
+            final sortedYears = availableYears.toList()..sort((a, b) => b.compareTo(a));
+
+            // Tentukan rentang 6 bulan (Misal April - Sept atau 6 bulan terakhir)
+            int endMonth = 9; // Default Sept sesuai desain mock
+            if (selectedYearInt == now.year && now.month >= 6) {
+              endMonth = now.month;
+            } else if (selectedYearInt == now.year && now.month < 6) {
+              endMonth = 6;
+            } else if (selectedYearInt < now.year) {
+              endMonth = 12;
+            }
+            final int startMonth = endMonth - 5;
+
+            final String subtitlePeriode =
+                'Periode ${_namaBulanSingkat[startMonth - 1]} - ${_namaBulanSingkat[endMonth - 1]} $selectedYearInt • Basis UMR Madiun';
+
+            // Filter transaksi per bulan untuk tahun terpilih
+            final Map<int, Map<String, int>> monthlyData = {};
+            for (int m = 1; m <= 12; m++) {
+              monthlyData[m] = {'total': 0, 'servis': 0, 'part': 0};
+            }
+
+            bool hasAnyRealTrxInYear = false;
+            for (final trx in validTrx) {
+              if (trx.dateTime.year == selectedYearInt) {
+                hasAnyRealTrxInYear = true;
+                final m = trx.dateTime.month;
+                int sTot = 0;
+                int pTot = 0;
+                for (final item in trx.items) {
+                  final bool isJasa = item.isService == true ||
+                      item.category.toLowerCase().contains('jasa') ||
+                      item.category.toLowerCase().contains('servis');
+                  if (isJasa) {
+                    sTot += item.price * item.quantity;
+                  } else {
+                    pTot += item.price * item.quantity;
+                  }
+                }
+                monthlyData[m]!['total'] = (monthlyData[m]!['total'] ?? 0) + trx.totalBayar;
+                monthlyData[m]!['servis'] = (monthlyData[m]!['servis'] ?? 0) + sTot;
+                monthlyData[m]!['part'] = (monthlyData[m]!['part'] ?? 0) + pTot;
+              }
+            }
+
+            // Hitung akumulasi omzet 6 bulan
+            int akumulasiOmzet = 0;
+            int maxMonthOmzet = 0;
+            int maxMonthIdx = endMonth;
+
+            for (int m = startMonth; m <= endMonth; m++) {
+              final tot = monthlyData[m]?['total'] ?? 0;
+              akumulasiOmzet += tot;
+              if (tot > maxMonthOmzet) {
+                maxMonthOmzet = tot;
+                maxMonthIdx = m;
+              }
+            }
+
+            final int displayAkumulasi = hasAnyRealTrxInYear ? akumulasiOmzet : 15150000;
+            final int displayRataRata = (displayAkumulasi / 6).round();
+
+            // Hitung tren persentase (3 bulan pertama vs 3 bulan terakhir)
+            String trendText = '▲ +17.0%';
+            String trendLabel = 'Tren Positif';
+            if (hasAnyRealTrxInYear) {
+              final firstHalf = (monthlyData[startMonth]?['total'] ?? 0) +
+                  (monthlyData[startMonth + 1]?['total'] ?? 0) +
+                  (monthlyData[startMonth + 2]?['total'] ?? 0);
+              final secondHalf = (monthlyData[startMonth + 3]?['total'] ?? 0) +
+                  (monthlyData[startMonth + 4]?['total'] ?? 0) +
+                  (monthlyData[startMonth + 5]?['total'] ?? 0);
+              if (firstHalf > 0) {
+                final diff = secondHalf - firstHalf;
+                final pct = (diff / firstHalf * 100);
+                if (diff >= 0) {
+                  trendText = '▲ +${pct.toStringAsFixed(1)}%';
+                  trendLabel = 'Tren Positif';
+                } else {
+                  trendText = '▼ ${pct.abs().toStringAsFixed(1)}%';
+                  trendLabel = 'Tren Menurun';
+                }
+              }
+            }
+
+            // Generate list bulan secara descending (dari endMonth ke startMonth)
+            final List<int> orderedMonths = [];
+            for (int m = endMonth; m >= startMonth; m--) {
+              orderedMonths.add(m);
+            }
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Header (Back Button, Title, Subtitle, Year Dropdown)
+                  _buildHeader(subtitlePeriode, sortedYears),
+                  const SizedBox(height: 16),
+
+                  // 2. Card Total Akumulasi Omzet (6 Bulan)
+                  _buildAkumulasiCard(
+                    akumulasi: displayAkumulasi,
+                    rataRata: displayRataRata,
+                    trendText: trendText,
+                    trendLabel: trendLabel,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 3. List Kartu Bulan-Bulan
+                  if (hasAnyRealTrxInYear)
+                    ...orderedMonths.map((m) {
+                      final monthName = '${_namaBulanLengkap[m - 1]} $selectedYearInt';
+                      final tot = monthlyData[m]?['total'] ?? 0;
+                      final sTot = monthlyData[m]?['servis'] ?? 0;
+                      final pTot = monthlyData[m]?['part'] ?? 0;
+
+                      final double sRatio = tot > 0 ? (sTot / tot) : 0.45;
+                      final int sPct = (sRatio * 100).round();
+                      final int pPct = 100 - sPct;
+
+                      // Bandingkan dengan bulan sebelumnya
+                      final prevM = m - 1;
+                      final prevTot = (prevM >= 1) ? (monthlyData[prevM]?['total'] ?? 0) : 0;
+
+                      String compStr = 'Basis Awal';
+                      bool? isPos;
+                      if (m > startMonth && prevTot > 0) {
+                        final diff = tot - prevTot;
+                        final double pct = (diff / prevTot * 100);
+                        if (diff >= 0) {
+                          compStr = '▲ +${pct.toStringAsFixed(1)}% vs ${_namaBulanSingkat[prevM - 1]}';
+                          isPos = true;
+                        } else {
+                          compStr = '▼ -${pct.abs().toStringAsFixed(1)}% vs ${_namaBulanSingkat[prevM - 1]}';
+                          isPos = false;
+                        }
+                      } else if (m == startMonth) {
+                        compStr = 'Basis Awal';
+                        isPos = null;
+                      }
+
+                      final bool isHighlight = (m == maxMonthIdx && tot > 0) || (m == endMonth && maxMonthOmzet == 0);
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _buildMonthCard(
+                          month: monthName,
+                          omzet: formatRupiah(tot),
+                          comparison: compStr,
+                          isPositive: isPos,
+                          isHighlight: isHighlight,
+                          servisText: 'Servis: ${formatRupiah(sTot)} ($sPct%)',
+                          partText: 'Part: ${formatRupiah(pTot)} ($pPct%)',
+                          servisRatio: sRatio.clamp(0.05, 0.95),
+                        ),
+                      );
+                    })
+                  else ...[
+                    // Mock baseline default bila data belum ada di database
+                    _buildMonthCard(
+                      month: 'September $selectedYearInt',
+                      omzet: 'Rp 2.750.000',
+                      comparison: '▲ +7.8% vs Agu',
+                      isPositive: true,
+                      isHighlight: true,
+                      servisText: 'Servis: Rp 1.240.000 (45%)',
+                      partText: 'Part: Rp 1.510.000 (55%)',
+                      servisRatio: 0.45,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildMonthCard(
+                      month: 'Agustus $selectedYearInt',
+                      omzet: 'Rp 2.550.000',
+                      comparison: '▲ +5.4% vs Jul',
+                      isPositive: true,
+                      isHighlight: false,
+                      servisText: 'Servis: Rp 1.150.000 (45%)',
+                      partText: 'Part: Rp 1.400.000 (55%)',
+                      servisRatio: 0.45,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildMonthCard(
+                      month: 'Juli $selectedYearInt',
+                      omzet: 'Rp 2.420.000',
+                      comparison: '▼ -6.9% vs Jun',
+                      isPositive: false,
+                      isHighlight: false,
+                      servisText: 'Servis: Rp 1.090.000 (45%)',
+                      partText: 'Part: Rp 1.330.000 (55%)',
+                      servisRatio: 0.45,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildMonthCard(
+                      month: 'Juni $selectedYearInt',
+                      omzet: 'Rp 2.600.000',
+                      comparison: '▲ +4.8% vs Mei',
+                      isPositive: true,
+                      isHighlight: false,
+                      servisText: 'Servis: Rp 1.170.000 (45%)',
+                      partText: 'Part: Rp 1.430.000 (55%)',
+                      servisRatio: 0.45,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildMonthCard(
+                      month: 'Mei $selectedYearInt',
+                      omzet: 'Rp 2.480.000',
+                      comparison: '▲ +5.5% vs Apr',
+                      isPositive: true,
+                      isHighlight: false,
+                      servisText: 'Servis: Rp 1.120.000 (45%)',
+                      partText: 'Part: Rp 1.360.000 (55%)',
+                      servisRatio: 0.45,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildMonthCard(
+                      month: 'April $selectedYearInt',
+                      omzet: 'Rp 2.350.000',
+                      comparison: 'Basis Awal',
+                      isPositive: null,
+                      isHighlight: false,
+                      servisText: 'Servis: Rp 1.060.000 (45%)',
+                      partText: 'Part: Rp 1.290.000 (55%)',
+                      servisRatio: 0.45,
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 10),
-
-              _buildMonthCard(
-                month: 'Agustus 2026',
-                omzet: 'Rp 2.550.000',
-                comparison: '▲ +5.4% vs Jul',
-                isPositive: true,
-                isHighlight: false,
-                servisText: 'Servis: Rp 1.150.000 (45%)',
-                partText: 'Part: Rp 1.400.000 (55%)',
-                servisRatio: 0.45,
-              ),
-              const SizedBox(height: 10),
-
-              _buildMonthCard(
-                month: 'Juli 2026',
-                omzet: 'Rp 2.420.000',
-                comparison: '▼ -6.9% vs Jun',
-                isPositive: false,
-                isHighlight: false,
-                servisText: 'Servis: Rp 1.090.000 (45%)',
-                partText: 'Part: Rp 1.330.000 (55%)',
-                servisRatio: 0.45,
-              ),
-              const SizedBox(height: 10),
-
-              _buildMonthCard(
-                month: 'Juni 2026',
-                omzet: 'Rp 2.600.000',
-                comparison: '▲ +4.8% vs Mei',
-                isPositive: true,
-                isHighlight: false,
-                servisText: 'Servis: Rp 1.170.000 (45%)',
-                partText: 'Part: Rp 1.430.000 (55%)',
-                servisRatio: 0.45,
-              ),
-              const SizedBox(height: 10),
-
-              _buildMonthCard(
-                month: 'Mei 2026',
-                omzet: 'Rp 2.480.000',
-                comparison: '▲ +5.5% vs Apr',
-                isPositive: true,
-                isHighlight: false,
-                servisText: 'Servis: Rp 1.120.000 (45%)',
-                partText: 'Part: Rp 1.360.000 (55%)',
-                servisRatio: 0.45,
-              ),
-              const SizedBox(height: 10),
-
-              _buildMonthCard(
-                month: 'April 2026',
-                omzet: 'Rp 2.350.000',
-                comparison: 'Basis Awal',
-                isPositive: null,
-                isHighlight: false,
-                servisText: 'Servis: Rp 1.060.000 (45%)',
-                partText: 'Part: Rp 1.290.000 (55%)',
-                servisRatio: 0.45,
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(String subtitlePeriode, List<String> sortedYears) {
     return Row(
       children: [
         GestureDetector(
@@ -139,8 +319,8 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
+            children: [
+              const Text(
                 'Rincian Omzet 6 Bulan',
                 style: TextStyle(
                   color: textWhite,
@@ -148,10 +328,10 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              SizedBox(height: 2),
+              const SizedBox(height: 2),
               Text(
-                'Periode Apr - Sept 2026 • Basis UMR Madiun',
-                style: TextStyle(
+                subtitlePeriode,
+                style: const TextStyle(
                   color: textMuted,
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
@@ -169,7 +349,7 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
-              value: _selectedYear,
+              value: sortedYears.contains(_selectedYear) ? _selectedYear : sortedYears.first,
               dropdownColor: cardBg,
               icon: const Icon(Icons.arrow_drop_down, color: textDim, size: 16),
               style: const TextStyle(
@@ -177,7 +357,7 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
-              items: ['2026', '2025']
+              items: sortedYears
                   .map((y) => DropdownMenuItem(value: y, child: Text(y)))
                   .toList(),
               onChanged: (val) {
@@ -190,7 +370,12 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
     );
   }
 
-  Widget _buildAkumulasiCard() {
+  Widget _buildAkumulasiCard({
+    required int akumulasi,
+    required int rataRata,
+    required String trendText,
+    required String trendLabel,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -204,8 +389,8 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
+            children: [
+              const Text(
                 'TOTAL AKUMULASI OMZET (6 BULAN)',
                 style: TextStyle(
                   color: textMuted,
@@ -214,19 +399,19 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
                   letterSpacing: 0.3,
                 ),
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
-                'Rp 15.150.000',
-                style: TextStyle(
+                formatRupiah(akumulasi),
+                style: const TextStyle(
                   color: textWhite,
                   fontSize: 19,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              SizedBox(height: 6),
+              const SizedBox(height: 6),
               Text(
-                'Rata-rata: Rp 2.525.000 / bln',
-                style: TextStyle(
+                'Rata-rata: ${formatRupiah(rataRata)} / bln',
+                style: const TextStyle(
                   color: accentGreen,
                   fontSize: 9.5,
                   fontWeight: FontWeight.w600,
@@ -244,9 +429,9 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: const Color(0xFF166534), width: 1),
                 ),
-                child: const Text(
-                  '▲ +17.0%',
-                  style: TextStyle(
+                child: Text(
+                  trendText,
+                  style: const TextStyle(
                     color: accentGreen,
                     fontSize: 10.5,
                     fontWeight: FontWeight.bold,
@@ -254,9 +439,9 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Tren Positif',
-                style: TextStyle(
+              Text(
+                trendLabel,
+                style: const TextStyle(
                   color: textDim,
                   fontSize: 8.5,
                   fontWeight: FontWeight.w500,
@@ -353,11 +538,11 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
               child: Row(
                 children: [
                   Expanded(
-                    flex: (servisRatio * 100).toInt(),
+                    flex: (servisRatio * 100).toInt().clamp(1, 99),
                     child: Container(color: accentRed),
                   ),
                   Expanded(
-                    flex: ((1 - servisRatio) * 100).toInt(),
+                    flex: ((1 - servisRatio) * 100).toInt().clamp(1, 99),
                     child: Container(color: accentBlue),
                   ),
                 ],

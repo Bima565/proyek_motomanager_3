@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../components/rupiah_formatter.dart';
+import '../../services/transaksi_service.dart';
 
-/// Screen 10 - (FR09) Rincian Transaksi Harian
+/// Screen 10 - (FR09) Rincian Transaksi Harian (Terintegrasi Cloud Firestore)
 class RincianTransaksiHarianPage extends StatefulWidget {
   final Map<String, dynamic>? userData;
 
@@ -24,113 +26,288 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
 
   String _selectedDay = 'Sabtu';
 
+  static const Map<String, int> _dayToWeekday = {
+    'Senin': 1,
+    'Selasa': 2,
+    'Rabu': 3,
+    'Kamis': 4,
+    'Jumat': 5,
+    'Sabtu': 6,
+    'Minggu': 7,
+  };
+
+  static const List<String> _namaBulanSingkat = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+    'Jul', 'Agu', 'Sept', 'Okt', 'Nov', 'Des'
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgDark,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Header (Back Button, Title, Subtitle, Day Dropdown)
-              _buildHeader(),
-              const SizedBox(height: 16),
+        child: AnimatedBuilder(
+          animation: TransaksiService().transactionsNotifier,
+          builder: (context, _) {
+            final allTrx = TransaksiService().transactions;
+            final validTrx = allTrx.where((t) => t.status.toLowerCase() != 'batal').toList();
 
-              // 2. Card Aktivitas Layanan per Jam
-              _buildAktivitasLayananCard(),
-              const SizedBox(height: 20),
+            final targetWeekday = _dayToWeekday[_selectedDay] ?? 6;
 
-              // 3. Section Header: Daftar Transaksi per Jam & 5 Selesai Badge
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // Ambil transaksi yang sesuai dengan hari yang dipilih
+            final dayTrx = validTrx.where((t) => t.dateTime.weekday == targetWeekday).toList();
+            final bool hasRealData = dayTrx.isNotEmpty;
+
+            // Cari tanggal yang relevan untuk subtitle header
+            DateTime targetDate;
+            if (hasRealData) {
+              targetDate = dayTrx.first.dateTime;
+            } else {
+              final now = DateTime.now();
+              final diff = targetWeekday - now.weekday;
+              targetDate = now.add(Duration(days: diff));
+            }
+
+            final String subtitleDate =
+                '$_selectedDay, ${targetDate.day} ${_namaBulanSingkat[targetDate.month - 1]} ${targetDate.year} • 08.00 - 17.00 WIB';
+
+            // 1. Kalkulasi Pendapatan Hari Tersebut
+            int totalHarian = 0;
+            int totalServisHarian = 0;
+            int totalPartHarian = 0;
+
+            for (final trx in dayTrx) {
+              totalHarian += trx.totalBayar;
+              for (final item in trx.items) {
+                final bool isJasa = item.isService == true ||
+                    item.category.toLowerCase().contains('jasa') ||
+                    item.category.toLowerCase().contains('servis');
+                if (isJasa) {
+                  totalServisHarian += item.price * item.quantity;
+                } else {
+                  totalPartHarian += item.price * item.quantity;
+                }
+              }
+            }
+
+            // Fallback mock baseline jika database hari ini belum ada transaksi
+            final int displayTotal = hasRealData ? totalHarian : 140000;
+            final int displayServis = hasRealData ? totalServisHarian : 65000;
+            final int displayPart = hasRealData ? totalPartHarian : 75000;
+            final int displayMotorCount = hasRealData ? dayTrx.length : 5;
+
+            final int servisPct = displayTotal > 0 ? (displayServis / displayTotal * 100).round() : 46;
+            final int partPct = displayTotal > 0 ? (displayPart / displayTotal * 100).round() : 54;
+
+            String kasirName = 'Sri Ekowati';
+            if (hasRealData && dayTrx.first.kasirName.isNotEmpty) {
+              kasirName = dayTrx.first.kasirName;
+            } else if (widget.userData?['name'] != null && widget.userData!['name'].toString().isNotEmpty) {
+              kasirName = widget.userData!['name'].toString();
+            }
+
+            // 2. Kalkulasi Data Bar Chart per 2 Jam (Jam 08, 10, 12, 14, 16)
+            final hourBuckets = [
+              {'label': 'Jam\n08', 'start': 8, 'end': 10},
+              {'label': 'Jam\n10', 'start': 10, 'end': 12},
+              {'label': 'Jam\n12', 'start': 12, 'end': 14},
+              {'label': 'Jam\n14', 'start': 14, 'end': 16},
+              {'label': 'Jam\n16', 'start': 16, 'end': 18},
+            ];
+
+            int maxHourTotal = 1;
+            final List<Map<String, dynamic>> calculatedHours = [];
+
+            for (final b in hourBuckets) {
+              final startH = b['start'] as int;
+              final endH = b['end'] as int;
+              int s = 0;
+              int p = 0;
+
+              for (final t in dayTrx) {
+                if (t.dateTime.hour >= startH && t.dateTime.hour < endH) {
+                  for (final item in t.items) {
+                    final bool isJasa = item.isService == true ||
+                        item.category.toLowerCase().contains('jasa') ||
+                        item.category.toLowerCase().contains('servis');
+                    if (isJasa) {
+                      s += item.price * item.quantity;
+                    } else {
+                      p += item.price * item.quantity;
+                    }
+                  }
+                }
+              }
+
+              if (s + p > maxHourTotal) maxHourTotal = s + p;
+              calculatedHours.add({'s': s, 'p': p, 'tot': s + p});
+            }
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Daftar Transaksi per Jam',
-                    style: TextStyle(
-                      color: textWhite,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  // 1. Header (Back Button, Title, Subtitle, Day Dropdown)
+                  _buildHeader(subtitleDate),
+                  const SizedBox(height: 16),
+
+                  // 2. Card Aktivitas Layanan per Jam
+                  _buildAktivitasLayananCard(
+                    totalHarian: displayTotal,
+                    servisHarian: displayServis,
+                    partHarian: displayPart,
+                    servisPct: servisPct,
+                    partPct: partPct,
+                    motorCount: displayMotorCount,
+                    kasirName: kasirName,
+                    hasRealData: hasRealData,
+                    calculatedHours: calculatedHours,
+                    maxHourTotal: maxHourTotal,
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0D2818),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF166534), width: 1),
-                    ),
-                    child: const Text(
-                      '✓ 5 Selesai',
-                      style: TextStyle(
-                        color: accentGreen,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.bold,
+                  const SizedBox(height: 20),
+
+                  // 3. Section Header: Daftar Transaksi per Jam & Selesai Badge
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Daftar Transaksi per Jam',
+                        style: TextStyle(
+                          color: textWhite,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0D2818),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF166534), width: 1),
+                        ),
+                        child: Text(
+                          '✓ $displayMotorCount Selesai',
+                          style: const TextStyle(
+                            color: accentGreen,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 12),
+
+                  // 4. List Transaksi Items
+                  if (hasRealData)
+                    ...dayTrx.map((trx) {
+                      // Format Jam
+                      final h = trx.dateTime.hour.toString().padLeft(2, '0');
+                      final m = trx.dateTime.minute.toString().padLeft(2, '0');
+                      final timeStr = '$h:$m';
+
+                      // Format Pelanggan & Kendaraan
+                      String custLine = trx.customerName.isEmpty ? 'Pelanggan Umum' : trx.customerName;
+                      if (trx.vehicleInfo.isNotEmpty) {
+                        custLine += ' • ${trx.vehicleInfo}';
+                      }
+                      if (trx.policeNumber.isNotEmpty) {
+                        custLine += ' (${trx.policeNumber})';
+                      }
+
+                      // Breakdown Tag Servis & Part
+                      final sItems = trx.items.where((i) {
+                        return i.isService == true ||
+                            i.category.toLowerCase().contains('jasa') ||
+                            i.category.toLowerCase().contains('servis');
+                      }).toList();
+                      final pItems = trx.items.where((i) => !sItems.contains(i)).toList();
+
+                      final int sTot = sItems.fold(0, (sum, i) => sum + i.price * i.quantity);
+                      final int pTot = pItems.fold(0, (sum, i) => sum + i.price * i.quantity);
+
+                      String sDesc = 'Tanpa Servis';
+                      if (sItems.isNotEmpty) {
+                        final sName = sItems.map((i) => i.name).join(' & ');
+                        sDesc = '$sName (${(sTot / 1000).round()}k)';
+                      }
+
+                      String pDesc = 'Tanpa Part';
+                      if (pItems.isNotEmpty) {
+                        final pName = pItems.map((i) => i.name).join(' & ');
+                        pDesc = 'Part: $pName (${(pTot / 1000).round()}k)';
+                      }
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _buildTransaksiItem(
+                          time: timeStr,
+                          paymentType: trx.paymentMethod,
+                          total: formatRupiah(trx.totalBayar),
+                          customerName: custLine,
+                          servisDesc: sDesc,
+                          partDesc: pDesc,
+                        ),
+                      );
+                    })
+                  else ...[
+                    // Mock baseline default bila data hari terpilih masih kosong
+                    _buildTransaksiItem(
+                      time: '08:45',
+                      paymentType: 'Tunai',
+                      total: 'Rp 35.000',
+                      customerName: 'Budi Santoso • Beat FI (AE 3912 BE)',
+                      servisDesc: 'Servis Ringan (15k)',
+                      partDesc: 'Part: Oli & Busi (20k)',
+                    ),
+                    const SizedBox(height: 10),
+                    _buildTransaksiItem(
+                      time: '10:15',
+                      paymentType: 'QRIS',
+                      total: 'Rp 45.000',
+                      customerName: 'Ahmad Fauzi • Vario 160 (AE 4921 KF)',
+                      servisDesc: 'Servis CVT (20k)',
+                      partDesc: 'Part: Kampas Rem (25k)',
+                    ),
+                    const SizedBox(height: 10),
+                    _buildTransaksiItem(
+                      time: '11:30',
+                      paymentType: 'Tunai',
+                      total: 'Rp 25.000',
+                      customerName: 'Ibu Sri Wahyuni • Mio M3 (AE 2481 RK)',
+                      servisDesc: 'Ganti Oli (10k)',
+                      partDesc: 'Part: Oli Mesin (15k)',
+                    ),
+                    const SizedBox(height: 10),
+                    _buildTransaksiItem(
+                      time: '14:10',
+                      paymentType: 'Tunai',
+                      total: 'Rp 20.000',
+                      customerName: 'Rudi Hartono • Supra X 125 (AE 5109 DA)',
+                      servisDesc: 'Servis: Stel Rem & Rantai (10k)',
+                      partDesc: 'Part: Rantai (10k)',
+                    ),
+                    const SizedBox(height: 10),
+                    _buildTransaksiItem(
+                      time: '16:00',
+                      paymentType: 'QRIS',
+                      total: 'Rp 15.000',
+                      customerName: 'Dian Pratama • NMAX (AE 6820 GL)',
+                      servisDesc: 'Tambal Tubeless (10k)',
+                      partDesc: 'Part: Cairan Ban (5k)',
+                    ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 12),
-
-              // 4. List Transaksi Items
-              _buildTransaksiItem(
-                time: '08:45',
-                paymentType: 'Tunai',
-                total: 'Rp 35.000',
-                customerName: 'Budi Santoso • Beat FI (AE 3912 BE)',
-                servisDesc: 'Servis Ringan (15k)',
-                partDesc: 'Part: Oli & Busi (20k)',
-              ),
-              const SizedBox(height: 10),
-
-              _buildTransaksiItem(
-                time: '10:15',
-                paymentType: 'QRIS',
-                total: 'Rp 45.000',
-                customerName: 'Ahmad Fauzi • Vario 160 (AE 4921 KF)',
-                servisDesc: 'Servis CVT (20k)',
-                partDesc: 'Part: Kampas Rem (25k)',
-              ),
-              const SizedBox(height: 10),
-
-              _buildTransaksiItem(
-                time: '11:30',
-                paymentType: 'Tunai',
-                total: 'Rp 25.000',
-                customerName: 'Ibu Sri Wahyuni • Mio M3 (AE 2481 RK)',
-                servisDesc: 'Ganti Oli (10k)',
-                partDesc: 'Part: Oli Mesin (15k)',
-              ),
-              const SizedBox(height: 10),
-
-              _buildTransaksiItem(
-                time: '14:10',
-                paymentType: 'Tunai',
-                total: 'Rp 20.000',
-                customerName: 'Rudi Hartono • Supra X 125 (AE 5109 DA)',
-                servisDesc: 'Servis: Stel Rem & Rantai (10k)',
-                partDesc: 'Part: Rantai (10k)',
-              ),
-              const SizedBox(height: 10),
-
-              _buildTransaksiItem(
-                time: '16:00',
-                paymentType: 'QRIS',
-                total: 'Rp 15.000',
-                customerName: 'Dian Pratama • NMAX (AE 6820 GL)',
-                servisDesc: 'Tambal Tubeless (10k)',
-                partDesc: 'Part: Cairan Ban (5k)',
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(String subtitleDate) {
     return Row(
       children: [
         GestureDetector(
@@ -150,8 +327,8 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
+            children: [
+              const Text(
                 'Rincian Transaksi',
                 style: TextStyle(
                   color: textWhite,
@@ -159,10 +336,10 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              SizedBox(height: 2),
+              const SizedBox(height: 2),
               Text(
-                'Sabtu, 26 Sept 2026 • 08.00 - 17.00 WIB',
-                style: TextStyle(
+                subtitleDate,
+                style: const TextStyle(
                   color: textMuted,
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
@@ -188,7 +365,7 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
-              items: ['Sabtu', 'Jumat', 'Kamis', 'Rabu', 'Selasa', 'Senin']
+              items: ['Sabtu', 'Jumat', 'Kamis', 'Rabu', 'Selasa', 'Senin', 'Minggu']
                   .map((d) => DropdownMenuItem(value: d, child: Text(d)))
                   .toList(),
               onChanged: (val) {
@@ -201,7 +378,18 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
     );
   }
 
-  Widget _buildAktivitasLayananCard() {
+  Widget _buildAktivitasLayananCard({
+    required int totalHarian,
+    required int servisHarian,
+    required int partHarian,
+    required int servisPct,
+    required int partPct,
+    required int motorCount,
+    required String kasirName,
+    required bool hasRealData,
+    required List<Map<String, dynamic>> calculatedHours,
+    required int maxHourTotal,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -231,9 +419,9 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFF166534), width: 1),
                 ),
-                child: const Text(
-                  'Total: Rp 140.000',
-                  style: TextStyle(
+                child: Text(
+                  'Total: ${formatRupiah(totalHarian)}',
+                  style: const TextStyle(
                     color: accentGreen,
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
@@ -242,42 +430,58 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Dual Bar Chart (Jam 08, 10, 12, 14, 16)
+              // Dual Bar Chart (Jam 08, 10, 12, 14, 16) - Bebas dari overflow
               Expanded(
                 flex: 6,
                 child: Column(
                   children: [
                     SizedBox(
-                      height: 90,
+                      height: 76,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          _buildHourBar('Jam\n08', 20, 22),
-                          _buildHourBar('Jam\n10', 32, 38),
-                          _buildHourBar('Jam\n12', 15, 18),
-                          _buildHourBar('Jam\n14', 20, 20),
-                          _buildHourBar('Jam\n16', 16, 12),
-                        ],
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: List.generate(5, (index) {
+                          final labels = ['Jam\n08', 'Jam\n10', 'Jam\n12', 'Jam\n14', 'Jam\n16'];
+                          if (!hasRealData) {
+                            // Mock height default
+                            final mockH = [
+                              {'s': 18.0, 'p': 20.0},
+                              {'s': 28.0, 'p': 34.0},
+                              {'s': 14.0, 'p': 16.0},
+                              {'s': 18.0, 'p': 18.0},
+                              {'s': 15.0, 'p': 11.0},
+                            ];
+                            return _buildHourBar(labels[index], mockH[index]['s']!, mockH[index]['p']!);
+                          }
+
+                          final hData = calculatedHours[index];
+                          final sVal = hData['s'] as int;
+                          final pVal = hData['p'] as int;
+
+                          final double sH = maxHourTotal > 0 ? (sVal / maxHourTotal * 34).clamp(3.0, 36.0) : 3.0;
+                          final double pH = maxHourTotal > 0 ? (pVal / maxHourTotal * 34).clamp(3.0, 36.0) : 3.0;
+
+                          return _buildHourBar(labels[index], sH, pH);
+                        }),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
+                      children: [
                         Text(
-                          '▼ Part (75k)',
-                          style: TextStyle(color: Color(0xFF3B82F6), fontSize: 8.5, fontWeight: FontWeight.w600),
+                          '▼ Part (${(partHarian / 1000).round()}k)',
+                          style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 8.5, fontWeight: FontWeight.w600),
                         ),
-                        SizedBox(width: 14),
+                        const SizedBox(width: 12),
                         Text(
-                          '▲ Servis (65k)',
-                          style: TextStyle(color: accentRed, fontSize: 8.5, fontWeight: FontWeight.w600),
+                          '▲ Servis (${(servisHarian / 1000).round()}k)',
+                          style: const TextStyle(color: accentRed, fontSize: 8.5, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -286,10 +490,10 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
               ),
 
               // Vertical divider
-              Container(width: 1, height: 90, color: cardBorder),
+              Container(width: 1, height: 80, color: cardBorder),
               const SizedBox(width: 12),
 
-              // Right side: Donut 5 Motor & details
+              // Right side: Donut Motor & details
               Expanded(
                 flex: 5,
                 child: Column(
@@ -298,21 +502,21 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
                     Row(
                       children: [
                         Container(
-                          width: 48,
-                          height: 48,
+                          width: 46,
+                          height: 46,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(color: const Color(0xFF3B82F6), width: 3),
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  '5',
-                                  style: TextStyle(color: textWhite, fontSize: 13, fontWeight: FontWeight.bold),
+                                  '$motorCount',
+                                  style: const TextStyle(color: textWhite, fontSize: 13, fontWeight: FontWeight.bold),
                                 ),
-                                Text(
+                                const Text(
                                   'MOTOR',
                                   style: TextStyle(color: textDim, fontSize: 6.5, fontWeight: FontWeight.bold),
                                 ),
@@ -324,21 +528,23 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text('Servis (46%)', style: TextStyle(color: textMuted, fontSize: 8.5)),
-                              Text('Rp 65.000', style: TextStyle(color: Color(0xFFFF3B44), fontSize: 9.5, fontWeight: FontWeight.bold)),
-                              SizedBox(height: 3),
-                              Text('Barang (54%)', style: TextStyle(color: textMuted, fontSize: 8.5)),
-                              Text('Rp 75.000', style: TextStyle(color: Color(0xFF60A5FA), fontSize: 9.5, fontWeight: FontWeight.bold)),
+                            children: [
+                              Text('Servis ($servisPct%)', style: const TextStyle(color: textMuted, fontSize: 8.5)),
+                              Text(formatRupiah(servisHarian), style: const TextStyle(color: Color(0xFFFF3B44), fontSize: 9.5, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 3),
+                              Text('Barang ($partPct%)', style: const TextStyle(color: textMuted, fontSize: 8.5)),
+                              Text(formatRupiah(partHarian), style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 9.5, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Kasir: Sri Ekowati',
-                      style: TextStyle(color: textDim, fontSize: 8, fontWeight: FontWeight.w500),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Kasir: $kasirName',
+                      style: const TextStyle(color: textDim, fontSize: 8, fontWeight: FontWeight.w500),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -352,14 +558,8 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
 
   Widget _buildHourBar(String label, double servisHeight, double partHeight) {
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: textMuted, fontSize: 7.5, height: 1.1),
-        ),
-        const SizedBox(height: 4),
         Container(
           width: 8,
           height: servisHeight,
@@ -377,6 +577,12 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
             borderRadius: BorderRadius.circular(2),
           ),
         ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: textMuted, fontSize: 7.5, height: 1.05),
+        ),
       ],
     );
   }
@@ -389,7 +595,7 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
     required String servisDesc,
     required String partDesc,
   }) {
-    final isQris = paymentType == 'QRIS';
+    final isQris = paymentType.toUpperCase() == 'QRIS';
 
     return Container(
       padding: const EdgeInsets.all(12),
