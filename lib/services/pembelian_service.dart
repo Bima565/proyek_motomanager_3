@@ -109,12 +109,14 @@ class PembelianRecord {
 
   factory PembelianRecord.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
-    final ts = data['timestamp'];
+    final ts = data['timestamp'] ?? data['createdAt'] ?? data['tanggal'] ?? data['date'] ?? data['waktu'];
     DateTime dt;
     if (ts is Timestamp) {
       dt = ts.toDate();
     } else if (ts is String) {
       dt = DateTime.tryParse(ts) ?? DateTime.now();
+    } else if (ts is int) {
+      dt = DateTime.fromMillisecondsSinceEpoch(ts);
     } else {
       dt = DateTime.now();
     }
@@ -124,6 +126,11 @@ class PembelianRecord {
         .map((i) => RestockItemModel.fromMap(Map<String, dynamic>.from(i as Map)))
         .toList();
 
+    int total = (data['totalAmount'] ?? data['totalBayar'] ?? data['total'] ?? data['totalHarga'] ?? data['totalBiaya'] as num?)?.toInt() ?? 0;
+    if (total == 0 && items.isNotEmpty) {
+      total = items.fold(0, (sum, it) => sum + (it.buyPrice * it.quantity));
+    }
+
     return PembelianRecord(
       id: doc.id,
       code: data['code']?.toString() ?? doc.id,
@@ -131,7 +138,7 @@ class PembelianRecord {
       buyerName: data['buyerName']?.toString() ?? 'Sugeng Yulianto',
       supplier: data['supplier']?.toString() ?? 'Toko Sumber Jaya',
       items: items,
-      totalAmount: (data['totalAmount'] as num?)?.toInt() ?? 0,
+      totalAmount: total,
       status: data['status']?.toString() ?? 'LUNAS',
       notes: data['notes']?.toString() ?? '',
     );
@@ -168,7 +175,18 @@ class PembelianService {
           pembelianNotifier.value = firestoreList;
         },
         onError: (err) {
-          debugPrint('Firestore pembelian stream error: $err');
+          debugPrint('Firestore pembelian stream error with orderBy: $err. Trying unordered...');
+          // Fallback listening tanpa orderBy jika index Firestore belum dibuat
+          _firestore.collection('transaksi_pembelian').snapshots().listen(
+            (snapshot) {
+              final firestoreList = snapshot.docs
+                  .map((doc) => PembelianRecord.fromFirestore(doc))
+                  .toList();
+              firestoreList.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+              pembelianNotifier.value = firestoreList;
+            },
+            onError: (e) => debugPrint('Firestore fallback pembelian stream error: $e'),
+          );
         },
       );
     } catch (e) {

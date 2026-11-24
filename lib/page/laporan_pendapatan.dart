@@ -40,15 +40,19 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
 
   String _selectedFilter = '30 Hari';
   int _selectedTrenYear = 2026;
+  int _selectedSemester = 2; // 1 = Jan - Jun, 2 = Jul - Des
   int? _tappedMonthIndex;
+  int? _tappedDayIndex; // 1 = Sen, ..., 7 = Min
   late DateTime _startDate;
   late DateTime _endDate;
+  bool _hasInitializedDates = false;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
-    _selectedTrenYear = now.year;
+    _selectedTrenYear = now.year >= 2026 ? now.year : 2026;
+    _selectedSemester = now.month <= 6 ? 1 : 2;
     _endDate = DateTime(now.year, now.month, now.day);
     _startDate = _endDate.subtract(const Duration(days: 29));
   }
@@ -73,8 +77,11 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
   void _applyQuickFilter(String label) {
     setState(() {
       _selectedFilter = label;
+      _tappedDayIndex = null;
+      final now = DateTime.now();
+      _endDate = DateTime(now.year, now.month, now.day);
       if (label == '1 Hari') {
-        _startDate = DateTime(_endDate.year, _endDate.month, _endDate.day);
+        _startDate = _endDate;
       } else if (label == '7 Hari') {
         _startDate = _endDate.subtract(const Duration(days: 6));
       } else if (label == '30 Hari') {
@@ -176,7 +183,59 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
 
     // Filter transaksi yang valid (bukan status 'batal')
     final validTrx = allTrx.where((t) => t.status.toLowerCase() != 'batal').toList();
-    final bool hasAnyData = validTrx.isNotEmpty;
+    final bool hasAnyData = validTrx.isNotEmpty || allPembelian.isNotEmpty;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // Inisialisasi pintar: sinkronkan ke tanggal transaksi terbaru di database jika hari ini belum ada data
+    if (!_hasInitializedDates && hasAnyData) {
+      _hasInitializedDates = true;
+      final bool hasToday = validTrx.any((t) =>
+              t.dateTime.year == now.year &&
+              t.dateTime.month == now.month &&
+              t.dateTime.day == now.day) ||
+          allPembelian.any((p) =>
+              p.dateTime.year == now.year &&
+              p.dateTime.month == now.month &&
+              p.dateTime.day == now.day);
+
+      if (hasToday) {
+        _endDate = today;
+        _startDate = _endDate.subtract(const Duration(days: 29));
+      } else {
+        DateTime? latestDate;
+        if (validTrx.isNotEmpty) {
+          latestDate = validTrx.first.dateTime;
+        }
+        if (allPembelian.isNotEmpty) {
+          final firstBeliDate = allPembelian.first.dateTime;
+          if (latestDate == null || firstBeliDate.isAfter(latestDate)) {
+            latestDate = firstBeliDate;
+          }
+        }
+        if (latestDate != null) {
+          _endDate = DateTime(latestDate.year, latestDate.month, latestDate.day);
+          _startDate = _endDate.subtract(const Duration(days: 29));
+        }
+      }
+    }
+
+    // Auto-update jendela filter jika ada transaksi/pembelian baru yang dibuat hari ini atau lebih baru dari _endDate
+    if (allPembelian.isNotEmpty) {
+      final latestBeli = allPembelian.first.dateTime;
+      final latestBeliDay = DateTime(latestBeli.year, latestBeli.month, latestBeli.day);
+      if (latestBeliDay.isAfter(_endDate)) {
+        _endDate = latestBeliDay;
+      }
+    }
+    if (validTrx.isNotEmpty) {
+      final latestTrx = validTrx.first.dateTime;
+      final latestTrxDay = DateTime(latestTrx.year, latestTrx.month, latestTrx.day);
+      if (latestTrxDay.isAfter(_endDate)) {
+        _endDate = latestTrxDay;
+      }
+    }
 
     // Filter transaksi sesuai rentang tanggal (_startDate s/d _endDate)
     final startWindow = DateTime(_startDate.year, _startDate.month, _startDate.day, 0, 0, 0);
@@ -210,8 +269,20 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
       }
     }
 
+    // Kalkulasi Biaya Pengeluaran Pembelian Sparepart (Stok) sesuai rentang tanggal terpilih
+    int totalPengeluaranBeli = 0;
+    int countBeli = 0;
+    for (final p in allPembelian) {
+      if (p.status.toUpperCase() != 'BATAL') {
+        if (!p.dateTime.isBefore(startWindow) && !p.dateTime.isAfter(endWindow)) {
+          totalPengeluaranBeli += p.totalAmount;
+          countBeli++;
+        }
+      }
+    }
+
     // Nilai terhitung dinamis dari Firestore (fallback ke mock bila database kosong)
-    final int totalOmzet = hasAnyData ? (totalOmzetPart + totalOmzetJasa) : 2750000;
+    final int omzetTotal = hasAnyData ? (totalOmzetPart + totalOmzetJasa) : 2750000;
     final int displayedOmzetPart = hasAnyData ? totalOmzetPart : 1510000;
     final int displayedOmzetJasa = hasAnyData ? totalOmzetJasa : 1240000;
     final int displayedCountPart = hasAnyData ? countPart : 26;
@@ -222,18 +293,20 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
     // Jasa Servis = 100% laba langsung (karena tanpa modal part)
     final int keuntunganJasa = hasAnyData ? totalOmzetJasa : 1240000;
 
-    // 1. LABA KOTOR BENGKEL = Untung Part + Jasa Servis
+    // 1. OMZET & MARGIN BENGKEL (Total Kotor Penjualan dari Servis & Sparepart Terjual)
     final int labaKotor = hasAnyData ? (keuntunganPart + keuntunganJasa) : 1700000;
-    final double marginLabaKotor = totalOmzet > 0 ? (labaKotor / totalOmzet * 100) : (hasAnyData ? 0.0 : 61.8);
+    final double marginOmzet = omzetTotal > 0 ? (labaKotor / omzetTotal * 100) : (hasAnyData ? 0.0 : 61.8);
 
-    // 2. LABA BERSIH (NET PROFIT) = Laba Kotor - Beban Operasional Toko
-    // Laba Kotor selalu LEBIH BESAR daripada Laba Bersih
+    // 2. PENGELUARAN (Total Biaya Belanja Sparepart untuk Stok / Restock dari Database)
+    final int pengeluaranTotal = totalPengeluaranBeli;
+
+    // 3. KEUNTUNGAN BERSIH (Keuntungan Mengalami Pengurangan Karena Belanja Restock Stok dan Biaya Operasional)
     final int bebanOperasional = hasAnyData ? (labaKotor * 0.205).round() : 350000;
-    final int labaBersih = hasAnyData ? math.max(0, labaKotor - bebanOperasional) : 1350000;
-    final double marginLabaBersih = totalOmzet > 0 ? (labaBersih / totalOmzet * 100) : (hasAnyData ? 0.0 : 49.1);
+    final int baseKeuntungan = hasAnyData ? math.max(0, labaKotor - bebanOperasional) : 1350000;
+    final int keuntunganBersih = math.max(0, baseKeuntungan - pengeluaranTotal);
 
-    final double partPercent = totalOmzet > 0 ? (displayedOmzetPart / totalOmzet) : (hasAnyData ? 0.0 : 0.55);
-    final double servisPercent = totalOmzet > 0 ? (displayedOmzetJasa / totalOmzet) : (hasAnyData ? 0.0 : 0.45);
+    final double partPercent = omzetTotal > 0 ? (displayedOmzetPart / omzetTotal) : (hasAnyData ? 0.0 : 0.55);
+    final double servisPercent = omzetTotal > 0 ? (displayedOmzetJasa / omzetTotal) : (hasAnyData ? 0.0 : 0.45);
 
     // 2. Chart Aktivitas Pendapatan Harian (Sen - Min) tetap menggunakan validTrx keseluruhan (Scope Mingguan Umum)
     final Map<int, Map<String, int>> dailyStats = {
@@ -266,36 +339,6 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
       }
     }
 
-    // 3. Overall bulanan untuk Tren Laba Bulanan (Line Chart)
-    int overallOmzetPart = 0;
-    int overallOmzetJasa = 0;
-    int overallHppPart = 0;
-    for (final trx in validTrx) {
-      for (final item in trx.items) {
-        if (item.isService) {
-          overallOmzetJasa += item.price * item.quantity;
-        } else {
-          overallOmzetPart += item.price * item.quantity;
-          final buyPrice = _findPartBuyPrice(item, allBarang, allPembelian);
-          overallHppPart += buyPrice * item.quantity;
-        }
-      }
-    }
-    final int overallLabaKotor = math.max(0, overallOmzetPart - overallHppPart) + overallOmzetJasa;
-    final int overallLabaBersih = math.max(0, overallLabaKotor - (overallLabaKotor * 0.205).round());
-
-    // Label dinamis Omzet sesuai periode terpilih
-    String omzetLabel = 'TOTAL OMZET BULANAN';
-    if (_selectedFilter == '1 Hari') {
-      omzetLabel = 'TOTAL OMZET HARIAN';
-    } else if (_selectedFilter == '7 Hari') {
-      omzetLabel = 'TOTAL OMZET MINGGUAN';
-    } else if (_selectedFilter == '30 Hari') {
-      omzetLabel = 'TOTAL OMZET BULANAN';
-    } else {
-      omzetLabel = 'TOTAL OMZET PERIODE';
-    }
-
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 110),
       child: Column(
@@ -305,10 +348,8 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
           _buildHeader(),
           const SizedBox(height: 16),
 
-          // 2. Card Aktivitas Pendapatan Harian & Total Omzet
+          // 2. Card Aktivitas Pendapatan Harian (Tren omzet di atas chart dihilangkan sesuai permintaan)
           _buildMainOmzetCard(
-            omzetLabel: omzetLabel,
-            totalOmzet: totalOmzet,
             hasData: hasAnyData,
             dailyStats: dailyStats,
             validTrx: validTrx,
@@ -318,15 +359,19 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
           const SizedBox(height: 16),
 
           // 3. Filter Rentang Tanggal & Periode
-          _buildDateAndFilterSection(),
+          _buildDateAndFilterSection(
+            isFilterEmpty: filteredTrx.isEmpty,
+            hasData: hasAnyData,
+          ),
           const SizedBox(height: 18),
 
-          // 4. Section Ringkasan Portofolio Keuangan
+          // 4. Section Ringkasan Portofolio Keuangan (Omzet, Pengeluaran, Keuntungan Bersih)
           _buildPortofolioKeuanganSection(
-            labaBersih: labaBersih,
-            marginLabaBersih: marginLabaBersih,
-            labaKotor: labaKotor,
-            marginLabaKotor: marginLabaKotor,
+            omzet: omzetTotal,
+            marginOmzet: marginOmzet,
+            pengeluaran: pengeluaranTotal,
+            countBeli: countBeli,
+            pendapatan: keuntunganBersih,
           ),
           const SizedBox(height: 16),
 
@@ -381,8 +426,6 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
 
   // --- 2. MAIN OMZET & DAILY ACTIVITY CARD ---
   Widget _buildMainOmzetCard({
-    required String omzetLabel,
-    required int totalOmzet,
     required bool hasData,
     required Map<int, Map<String, int>> dailyStats,
     required List<TransaksiPenjualanModel> validTrx,
@@ -391,6 +434,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
   }) {
     // Hitung bar chart data
     final days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+    final dayNames = {1: 'Senin', 2: 'Selasa', 3: 'Rabu', 4: 'Kamis', 5: 'Jumat', 6: 'Sabtu', 7: 'Minggu'};
     int maxVal = 1;
     for (int i = 1; i <= 7; i++) {
       final t = dailyStats[i]?['total'] ?? 0;
@@ -408,70 +452,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Total Omzet Bulanan + Persentase Badge
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    omzetLabel,
-                    style: const TextStyle(
-                      color: textDim,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    formatRupiah(totalOmzet),
-                    style: const TextStyle(
-                      color: textWhite,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0C2718),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF166534), width: 1),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Text(
-                      '▲',
-                      style: TextStyle(
-                        color: accentGreen,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      '+12.4% vs Agt',
-                      style: TextStyle(
-                        color: accentGreen,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Aktivitas Pendapatan Harian + Legend
+          // Aktivitas Pendapatan Harian + Legend (Tren Omzet di atas chart dihilangkan sesuai permintaan)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -479,7 +460,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                 'Aktivitas Pendapatan Harian',
                 style: TextStyle(
                   color: textWhite,
-                  fontSize: 12.5,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -494,7 +475,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
           ),
           const SizedBox(height: 16),
 
-          // Dual Bar Chart (Sen - Min)
+          // Dual Bar Chart (Sen - Min) - Interaktif saat ditekan
           SizedBox(
             height: 110,
             child: Row(
@@ -534,12 +515,97 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                 final double pH = maxVal > 0 ? (pVal / maxVal * 65).clamp(4.0, 70.0) : 4.0;
                 final bool isPeak = tot == maxVal && tot > 0;
                 final String valText = tot > 0 ? '${(tot / 1000).round()}k' : '0k';
+                final bool isTapped = _tappedDayIndex == dayNum;
 
-                return _buildBarDay(dayLabel, valText, sH, pH, isPeak || dayLabel == 'Sab');
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    setState(() {
+                      if (_tappedDayIndex == dayNum) {
+                        _tappedDayIndex = null;
+                      } else {
+                        _tappedDayIndex = dayNum;
+                      }
+                    });
+                  },
+                  child: _buildBarDay(
+                    dayLabel,
+                    valText,
+                    sH,
+                    pH,
+                    isTapped || (_tappedDayIndex == null && (isPeak || dayLabel == 'Sab')),
+                    isSelected: isTapped,
+                  ),
+                );
               }),
             ),
           ),
-          const SizedBox(height: 20),
+
+          // Detail Card saat Bar Harian Ditekan
+          if (_tappedDayIndex != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E2433),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: accentYellow.withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.touch_app_rounded, color: accentYellow, size: 14),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${dayNames[_tappedDayIndex]}: ${formatRupiah(dailyStats[_tappedDayIndex]?['total'] ?? 0)}',
+                          style: const TextStyle(
+                            color: textWhite,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            '(Servis: ${formatRupiah(dailyStats[_tappedDayIndex]?['servis'] ?? 0)} • Part: ${formatRupiah(dailyStats[_tappedDayIndex]?['part'] ?? 0)})',
+                            style: const TextStyle(
+                              color: textMuted,
+                              fontSize: 10,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _tappedDayIndex = null;
+                      });
+                    },
+                    child: const Icon(Icons.close_rounded, color: textDim, size: 14),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                'Ketuk batang hari (Sen - Min) untuk melihat rincian omzet per hari',
+                style: TextStyle(
+                  color: textDim.withValues(alpha: 0.8),
+                  fontSize: 9.5,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
 
           // Tombol Unduh PDF (Pill Merah di Tengah)
           Center(
@@ -583,56 +649,66 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
     );
   }
 
-  Widget _buildBarDay(String day, String value, double hServis, double hPart, bool isHighlight) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            color: isHighlight ? accentYellow : textDim,
-            fontSize: 9,
-            fontWeight: isHighlight ? FontWeight.bold : FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Container(
-              width: 7.5,
-              height: hServis,
-              decoration: BoxDecoration(
-                color: accentRed,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
-              ),
+  Widget _buildBarDay(String day, String value, double hServis, double hPart, bool isHighlight, {bool isSelected = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: isSelected
+          ? BoxDecoration(
+              color: accentYellow.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: accentYellow.withValues(alpha: 0.8), width: 1.2),
+            )
+          : null,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              color: isHighlight ? accentYellow : textDim,
+              fontSize: 9,
+              fontWeight: isHighlight ? FontWeight.bold : FontWeight.w600,
             ),
-            const SizedBox(width: 2.5),
-            Container(
-              width: 7.5,
-              height: hPart,
-              decoration: BoxDecoration(
-                color: accentBlue,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          day,
-          style: TextStyle(
-            color: isHighlight ? accentYellow : textDim,
-            fontSize: 10,
-            fontWeight: isHighlight ? FontWeight.bold : FontWeight.w500,
           ),
-        ),
-      ],
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                width: 7.5,
+                height: hServis,
+                decoration: BoxDecoration(
+                  color: accentRed,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                ),
+              ),
+              const SizedBox(width: 2.5),
+              Container(
+                width: 7.5,
+                height: hPart,
+                decoration: BoxDecoration(
+                  color: accentBlue,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            day,
+            style: TextStyle(
+              color: isHighlight ? accentYellow : textDim,
+              fontSize: 10,
+              fontWeight: isHighlight ? FontWeight.bold : FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   // --- 3. FILTER RENTANG TANGGAL & HARI ---
-  Widget _buildDateAndFilterSection() {
+  Widget _buildDateAndFilterSection({required bool isFilterEmpty, required bool hasData}) {
     return Column(
       children: [
         // Rentang Tanggal Row
@@ -640,7 +716,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
           children: [
             Expanded(
               child: _buildDateBox(
-                '${_startDate.day}/${_startDate.month}/${_startDate.year}',
+                '${_startDate.day.toString().padLeft(2, '0')}/${_startDate.month.toString().padLeft(2, '0')}/${_startDate.year}',
                 isHighlighted: true,
                 onTap: () async {
                   final picked = await CustomCalendarDialog.show(
@@ -669,7 +745,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
             ),
             Expanded(
               child: _buildDateBox(
-                '${_endDate.day}/${_endDate.month}/${_endDate.year}',
+                '${_endDate.day.toString().padLeft(2, '0')}/${_endDate.month.toString().padLeft(2, '0')}/${_endDate.year}',
                 isHighlighted: false,
                 onTap: () async {
                   final picked = await CustomCalendarDialog.show(
@@ -702,6 +778,49 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
             Expanded(child: _buildFilterTab('30 Hari')),
           ],
         ),
+
+        // Banner Informatif jika periode terpilih belum ada transaksi
+        if (isFilterEmpty && hasData) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF19202E),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: accentBlue.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline_rounded, color: accentBlue, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Belum ada transaksi di rentang tanggal ini. Ketuk tombol untuk melihat seluruh data:',
+                    style: const TextStyle(color: textMuted, fontSize: 10.5),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => _applyQuickFilter('30 Hari'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: accentBlue.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      '30 Hari',
+                      style: TextStyle(
+                        color: accentBlue,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -785,12 +904,14 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
 
   // --- 4. SECTION RINGKASAN PORTOFOLIO KEUANGAN ---
   Widget _buildPortofolioKeuanganSection({
-    required int labaBersih,
-    required double marginLabaBersih,
-    required int labaKotor,
-    required double marginLabaKotor,
+    required int omzet,
+    required double marginOmzet,
+    required int pengeluaran,
+    required int countBeli,
+    required int pendapatan,
   }) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Section Header
         Row(
@@ -828,83 +949,10 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
         ),
         const SizedBox(height: 10),
 
-        // Dua Kartu Berdampingan (Laba Bersih & Laba Kotor)
+        // Baris 1: Dua Kartu Berdampingan (OMZET & PENGELUARAN)
         Row(
           children: [
-            // Kartu Laba Bersih (Net) - Border Hijau
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F1E17),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: accentGreen, width: 1.2),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Icon(
-                          Icons.trending_up_rounded,
-                          color: accentGreen,
-                          size: 18,
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0B291A),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFF15803D), width: 1),
-                          ),
-                          child: Text(
-                            'Kas ${marginLabaBersih.toStringAsFixed(1)}%',
-                            style: const TextStyle(
-                              color: accentGreen,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'LABA BERSIH (NET)',
-                      style: TextStyle(
-                        color: accentGreen,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      formatRupiah(labaBersih),
-                      style: const TextStyle(
-                        color: textWhite,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Kas Real Bersih Bengkel',
-                      style: TextStyle(
-                        color: textDim,
-                        fontSize: 9,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-
-            // Kartu Laba Kotor - Border Slate/Biru
+            // Kartu 1: OMZET (Aksen Biru - Total Penjualan Kotor)
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(12),
@@ -932,7 +980,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                             border: Border.all(color: const Color(0xFF0369A1), width: 1),
                           ),
                           child: Text(
-                            'Margin ${marginLabaKotor.toStringAsFixed(1)}%',
+                            'Margin ${marginOmzet.toStringAsFixed(1)}%',
                             style: const TextStyle(
                               color: accentBlue,
                               fontSize: 9,
@@ -944,7 +992,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'LABA KOTOR',
+                      'OMZET',
                       style: TextStyle(
                         color: textMuted,
                         fontSize: 9.5,
@@ -954,7 +1002,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      formatRupiah(labaKotor),
+                      formatRupiah(omzet),
                       style: const TextStyle(
                         color: textWhite,
                         fontSize: 16,
@@ -963,7 +1011,80 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Untung Part + Jasa Servis',
+                      'Total Penjualan Kotor',
+                      style: TextStyle(
+                        color: textDim,
+                        fontSize: 9,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+
+            // Kartu 2: PENGELUARAN (Aksen Oranye / Merah - Biaya Pembelian Sparepart untuk Stok)
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF22161A),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFF3F1F27), width: 1.2),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Icon(
+                          Icons.shopping_bag_outlined,
+                          color: Color(0xFFF87171),
+                          size: 18,
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3B1820),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF991B1B), width: 1),
+                          ),
+                          child: Text(
+                            countBeli > 0 ? '$countBeli Pembelian' : '0 Pembelian',
+                            style: const TextStyle(
+                              color: Color(0xFFF87171),
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'PENGELUARAN',
+                      style: TextStyle(
+                        color: Color(0xFFF87171),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      formatRupiah(pengeluaran),
+                      style: const TextStyle(
+                        color: textWhite,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Beli Sparepart Stok',
                       style: TextStyle(
                         color: textDim,
                         fontSize: 9,
@@ -976,6 +1097,83 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 10),
+
+        // Baris 2: Kartu PENDAPATAN (Full Width - Aksen Hijau Bersih)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F1E17),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: accentGreen, width: 1.2),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.trending_up_rounded,
+                          color: accentGreen,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'KEUNTUNGAN BERSIH',
+                          style: TextStyle(
+                            color: accentGreen,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0B291A),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF15803D), width: 1),
+                          ),
+                          child: const Text(
+                            'Kas Bersih',
+                            style: TextStyle(
+                              color: accentGreen,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      formatRupiah(pendapatan),
+                      style: const TextStyle(
+                        color: textWhite,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Keuntungan Bersih (Omzet - Operasional - Belanja Stok)',
+                      style: TextStyle(
+                        color: textDim,
+                        fontSize: 9.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -1288,18 +1486,89 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
     );
   }
 
+  // --- Tombol Geser Bulan Sederhana & Rapi (Semester 1: Jan-Jun, Semester 2: Jul-Des) ---
+  Widget _buildSemesterSwitcher() {
+    return Container(
+      height: 32,
+      padding: const EdgeInsets.all(2.5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D121D),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: cardBorder, width: 1),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildSemesterTab(1, 'Januari – Juni', 'Semester 1'),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: _buildSemesterTab(2, 'Juli – Desember', 'Semester 2'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSemesterTab(int semester, String label, String sublabel) {
+    final bool isSelected = _selectedSemester == semester;
+    return GestureDetector(
+      onTap: () {
+        if (_selectedSemester != semester) {
+          setState(() {
+            _selectedSemester = semester;
+            _tappedMonthIndex = null;
+          });
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF162338) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: isSelected
+              ? Border.all(color: accentBlue.withValues(alpha: 0.6), width: 1)
+              : null,
+        ),
+        child: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isSelected) ...[
+                const Icon(Icons.check_circle_rounded, color: accentBlue, size: 11),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? textWhite : textDim,
+                  fontSize: 10.5,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // --- 6. CARD TREN LABA BULANAN (MULTI-LINE CHART) ---
   Widget _buildTrenLabaBulananCard({
     required List<TransaksiPenjualanModel> validTrx,
     required List<BarangModel> allBarang,
     required List<PembelianRecord> allPembelian,
   }) {
-    final List<String> months = [
+    final List<String> allMonthNames = [
       'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
       'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
     ];
 
-    // Hitung pemasukan laba kotor & laba bersih per bulan untuk tahun terpilih
+    // Tampilkan 6 bulan sesuai semester (Semester 1: Jan - Jun, Semester 2: Jul - Des)
+    final int startMonth = _selectedSemester == 1 ? 1 : 7;
+    final int endMonth = _selectedSemester == 1 ? 6 : 12;
+    final List<String> displayMonths = allMonthNames.sublist(startMonth - 1, endMonth);
+
+    // Hitung pemasukan omzet & laba bersih (keuntungan) per bulan untuk tahun terpilih
     final Map<int, int> monthlyKotor = {};
     final Map<int, int> monthlyBersih = {};
     for (int m = 1; m <= 12; m++) {
@@ -1331,19 +1600,36 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
         final operasional = (kotor * 0.205).round();
         final bersih = math.max(0, kotor - operasional);
 
-        monthlyKotor[m] = (monthlyKotor[m] ?? 0) + kotor;
+        // Omzet kotor tetap (belum dikurangi biaya)
+        monthlyKotor[m] = (monthlyKotor[m] ?? 0) + (omzetPart + omzetJasa);
         monthlyBersih[m] = (monthlyBersih[m] ?? 0) + bersih;
+      }
+    }
+
+    // Alur bisnis: Keuntungan berkurang jika ada pembelian sparepart untuk restock di bulan tersebut
+    for (final p in allPembelian) {
+      if (p.status.toUpperCase() != 'BATAL' && p.dateTime.year == _selectedTrenYear) {
+        final m = p.dateTime.month;
+        if (monthlyBersih.containsKey(m)) {
+          monthlyBersih[m] = math.max(0, (monthlyBersih[m] ?? 0) - p.totalAmount);
+        }
       }
     }
 
     final now = DateTime.now();
     int maxMonthToDraw;
     if (_selectedTrenYear < now.year) {
-      maxMonthToDraw = 12; // Tahun sebelumnya: 12 bulan sudah terlewati
+      maxMonthToDraw = 6; // Tahun sebelumnya: semua 6 bulan sudah lewat
     } else if (_selectedTrenYear == now.year) {
-      // Tahun berjalan: garis hanya sampai bulan saat ini
-      // Bulan berikutnya masih kosong belum ada garis
-      maxMonthToDraw = now.month;
+      if (_selectedSemester == 1) {
+        maxMonthToDraw = now.month >= 6 ? 6 : now.month;
+      } else {
+        if (now.month < 7) {
+          maxMonthToDraw = 0; // Belum masuk semester 2
+        } else {
+          maxMonthToDraw = (now.month - 6).clamp(0, 6);
+        }
+      }
     } else {
       maxMonthToDraw = 0; // Tahun depan: garis belum ada
     }
@@ -1354,7 +1640,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
     int sumKotor = 0;
     int countActive = 0;
 
-    for (int m = 1; m <= 12; m++) {
+    for (int m = startMonth; m <= endMonth; m++) {
       final int kotorRp = monthlyKotor[m] ?? 0;
       final int bersihRp = monthlyBersih[m] ?? 0;
 
@@ -1364,7 +1650,8 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
       labaKotorValues.add(kVal);
       labaBersihValues.add(bVal);
 
-      if (m <= maxMonthToDraw) {
+      final int relativeIndex = m - startMonth;
+      if (relativeIndex < maxMonthToDraw) {
         sumKotor += kotorRp;
         countActive++;
       }
@@ -1383,7 +1670,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row
+          // 1. Header Row (Judul, Dropdown Tahun, Detail) - Rapi & Tidak Berdesakan
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1400,7 +1687,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                   ),
                   SizedBox(height: 2),
                   Text(
-                    '(Laba Kotor vs Laba Bersih)',
+                    '(Omzet vs Keuntungan Bersih)',
                     style: TextStyle(
                       color: textDim,
                       fontSize: 10,
@@ -1424,7 +1711,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                       );
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
                         color: const Color(0xFF0F2033),
                         borderRadius: BorderRadius.circular(8),
@@ -1434,7 +1721,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                         'Detail ›',
                         style: TextStyle(
                           color: accentBlue,
-                          fontSize: 10,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -1444,22 +1731,26 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          // Multi-Line Chart with Y-Axis Percentage and Dual Curve with Touch Interactivity
+          // 2. Tombol Geser Bulan Sederhana (Full-Width, Sangat Rapi & Tidak Memakan Ruang)
+          _buildSemesterSwitcher(),
+          const SizedBox(height: 12),
+
+          // Multi-Line Chart with Touch Interactivity & Swipe / Drag support
           LayoutBuilder(
             builder: (context, constraints) {
               final double chartWidth = constraints.maxWidth;
               const double leftMargin = 32.0;
               const double rightMargin = 12.0;
               final double usableWidth = chartWidth - leftMargin - rightMargin;
-              final double stepX = usableWidth / (months.length - 1);
+              final double stepX = usableWidth / (displayMonths.length - 1);
 
               void handleTouch(Offset localPos) {
                 if (maxMonthToDraw <= 0) return;
                 final double dx = localPos.dx;
                 final int idx = ((dx - leftMargin + stepX / 2) / stepX).floor();
-                if (idx >= 0 && idx < maxMonthToDraw) {
+                if (idx >= 0 && idx < maxMonthToDraw && idx < displayMonths.length) {
                   setState(() {
                     _tappedMonthIndex = (_tappedMonthIndex == idx) ? null : idx;
                   });
@@ -1470,18 +1761,40 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                 behavior: HitTestBehavior.opaque,
                 onTapDown: (details) => handleTouch(details.localPosition),
                 onPanUpdate: (details) => handleTouch(details.localPosition),
+                onHorizontalDragEnd: (details) {
+                  if (details.primaryVelocity != null) {
+                    if (details.primaryVelocity! < -150) {
+                      // Swipe kiri: Beralih ke Semester 2 (Jul - Des)
+                      if (_selectedSemester == 1) {
+                        setState(() {
+                          _selectedSemester = 2;
+                          _tappedMonthIndex = null;
+                        });
+                      }
+                    } else if (details.primaryVelocity! > 150) {
+                      // Swipe kanan: Beralih ke Semester 1 (Jan - Jun)
+                      if (_selectedSemester == 2) {
+                        setState(() {
+                          _selectedSemester = 1;
+                          _tappedMonthIndex = null;
+                        });
+                      }
+                    }
+                  }
+                },
                 child: SizedBox(
                   height: 132,
                   width: double.infinity,
                   child: CustomPaint(
                     painter: _TrenLabaBulananPainter(
-                      months: months,
+                      months: displayMonths,
                       labaKotorValues: labaKotorValues,
                       monthlyKotor: monthlyKotor,
                       labaBersihValues: labaBersihValues,
                       monthlyBersih: monthlyBersih,
                       maxMonthToDraw: maxMonthToDraw,
                       tappedIndex: _tappedMonthIndex,
+                      startMonthOffset: startMonth,
                     ),
                   ),
                 ),
@@ -1490,14 +1803,14 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
           ),
           const SizedBox(height: 10),
 
-          // Legend Laba Kotor & Laba Bersih
+          // Legend Omzet & Keuntungan Bersih
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(width: 14, height: 2.5, color: accentBlue),
               const SizedBox(width: 4),
               const Text(
-                'Laba Kotor',
+                'Omzet',
                 style: TextStyle(
                   color: accentBlue,
                   fontSize: 10,
@@ -1508,7 +1821,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
               Container(width: 14, height: 2.5, color: accentGreen),
               const SizedBox(width: 4),
               const Text(
-                'Laba Bersih',
+                'Keuntungan Bersih',
                 style: TextStyle(
                   color: accentGreen,
                   fontSize: 10,
@@ -1521,54 +1834,59 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
 
           // Info Card saat titik/garis bulan ditekan
           if (_tappedMonthIndex != null && _tappedMonthIndex! < maxMonthToDraw) ...[
-            Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF101928),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: accentBlue.withValues(alpha: 0.5)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
+            Builder(
+              builder: (context) {
+                final int tappedRealMonth = startMonth + _tappedMonthIndex!;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF101928),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: accentBlue.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(Icons.touch_app_rounded, color: accentBlue, size: 14),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${months[_tappedMonthIndex!]} $_selectedTrenYear',
-                        style: const TextStyle(
-                          color: textWhite,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        children: [
+                          const Icon(Icons.touch_app_rounded, color: accentBlue, size: 14),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${displayMonths[_tappedMonthIndex!]} $_selectedTrenYear',
+                            style: const TextStyle(
+                              color: textWhite,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Text(
+                            'Omzet: ${formatRupiah(monthlyKotor[tappedRealMonth] ?? 0)}',
+                            style: const TextStyle(
+                              color: accentBlue,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Keuntungan: ${formatRupiah(monthlyBersih[tappedRealMonth] ?? 0)}',
+                            style: const TextStyle(
+                              color: accentGreen,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  Row(
-                    children: [
-                      Text(
-                        'Kotor: ${formatRupiah(monthlyKotor[_tappedMonthIndex! + 1] ?? 0)}',
-                        style: const TextStyle(
-                          color: accentBlue,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Bersih: ${formatRupiah(monthlyBersih[_tappedMonthIndex! + 1] ?? 0)}',
-                        style: const TextStyle(
-                          color: accentGreen,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ] else ...[
             Padding(
@@ -1577,10 +1895,10 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: const [
-                    Icon(Icons.touch_app_outlined, color: textDim, size: 12),
+                    Icon(Icons.swipe_outlined, color: textDim, size: 12),
                     SizedBox(width: 5),
                     Text(
-                      'Tekan titik / garis bulan untuk melihat rincian nominal laba',
+                      'Geser chart atau pilih semester untuk ganti periode bulan',
                       style: TextStyle(
                         color: textDim,
                         fontSize: 9.5,
@@ -1705,6 +2023,7 @@ class _TrenLabaBulananPainter extends CustomPainter {
   final Map<int, int> monthlyBersih;
   final int maxMonthToDraw;
   final int? tappedIndex;
+  final int startMonthOffset;
 
   _TrenLabaBulananPainter({
     required this.months,
@@ -1714,6 +2033,7 @@ class _TrenLabaBulananPainter extends CustomPainter {
     required this.monthlyBersih,
     required this.maxMonthToDraw,
     this.tappedIndex,
+    this.startMonthOffset = 1,
   });
 
   @override
@@ -1726,13 +2046,13 @@ class _TrenLabaBulananPainter extends CustomPainter {
     final chartWidth = size.width - leftMargin - rightMargin;
     final chartHeight = size.height - topMargin - bottomMargin;
 
-    // 1. Gambar Y-Axis Labels & Horizontal Grid Lines
+    // 1. Gambar Y-Axis Labels & Horizontal Grid Lines (Bersih & Bebas Overload)
     final gridPaint = Paint()
       ..color = const Color(0xFF1E2433)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8;
 
-    final yPercentages = ['100%', '80%', '60%', '40%', '20%', '0%'];
+    final yPercentages = ['100%', '75%', '50%', '25%', '0%'];
     for (int i = 0; i < yPercentages.length; i++) {
       final y = topMargin + (i / (yPercentages.length - 1)) * chartHeight;
 
@@ -1757,12 +2077,16 @@ class _TrenLabaBulananPainter extends CustomPainter {
     }
 
     // 2. Skala Maksimum Y
+    // Menggunakan skala target kapasitas bulanan bengkel (default Rp 3.000.000).
+    // Jika nominal kecil (misal 140k = 0.14), nilainya di bawah 10% (0.14 / 3.0 = 4.6%)
+    // Sesuai permintaan: jika nominal kecil berada di bawah 10%, tidak melonjak ke 50%!
     double maxData = 0.0;
     for (int i = 0; i < maxMonthToDraw && i < labaKotorValues.length; i++) {
       if (labaKotorValues[i] > maxData) maxData = labaKotorValues[i];
       if (labaBersihValues[i] > maxData) maxData = labaBersihValues[i];
     }
-    final double maxVal = maxData > 0 ? (maxData * 1.35) : 2.0;
+    const double benchmarkCapacity = 3.0; // Kapasitas acuan Rp 3.000.000
+    final double maxVal = math.max(benchmarkCapacity, maxData * 1.25);
     const double minVal = 0.0;
 
     final stepX = chartWidth / (months.length - 1);
@@ -1857,8 +2181,9 @@ class _TrenLabaBulananPainter extends CustomPainter {
       }
 
       // Nominal bulanan terpilih
-      final int kotorRp = monthlyKotor[tappedIndex! + 1] ?? 0;
-      final int bersihRp = monthlyBersih[tappedIndex! + 1] ?? 0;
+      final int realMonth = startMonthOffset + tappedIndex!;
+      final int kotorRp = monthlyKotor[realMonth] ?? 0;
+      final int bersihRp = monthlyBersih[realMonth] ?? 0;
 
       // Tooltip Card di atas garis
       final tpTooltip = TextPainter(
@@ -1869,7 +2194,7 @@ class _TrenLabaBulananPainter extends CustomPainter {
               style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
             ),
             TextSpan(
-              text: 'Kotor ${formatRupiah(kotorRp)} ',
+              text: 'Omzet ${formatRupiah(kotorRp)} ',
               style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 8.5, fontWeight: FontWeight.bold),
             ),
             const TextSpan(
@@ -1877,7 +2202,7 @@ class _TrenLabaBulananPainter extends CustomPainter {
               style: TextStyle(color: Color(0xFF64748B), fontSize: 8.5),
             ),
             TextSpan(
-              text: 'Bersih ${formatRupiah(bersihRp)}',
+              text: 'Keuntungan ${formatRupiah(bersihRp)}',
               style: const TextStyle(color: Color(0xFF22C55E), fontSize: 8.5, fontWeight: FontWeight.bold),
             ),
           ],

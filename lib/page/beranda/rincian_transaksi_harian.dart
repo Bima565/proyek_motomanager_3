@@ -441,7 +441,7 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
                 child: Column(
                   children: [
                     SizedBox(
-                      height: 76,
+                      height: 84,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         crossAxisAlignment: CrossAxisAlignment.end,
@@ -450,11 +450,11 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
                           if (!hasRealData) {
                             // Mock height default
                             final mockH = [
-                              {'s': 18.0, 'p': 20.0},
-                              {'s': 28.0, 'p': 34.0},
+                              {'s': 16.0, 'p': 18.0},
+                              {'s': 24.0, 'p': 28.0},
                               {'s': 14.0, 'p': 16.0},
-                              {'s': 18.0, 'p': 18.0},
-                              {'s': 15.0, 'p': 11.0},
+                              {'s': 16.0, 'p': 18.0},
+                              {'s': 14.0, 'p': 11.0},
                             ];
                             return _buildHourBar(labels[index], mockH[index]['s']!, mockH[index]['p']!);
                           }
@@ -463,8 +463,8 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
                           final sVal = hData['s'] as int;
                           final pVal = hData['p'] as int;
 
-                          final double sH = maxHourTotal > 0 ? (sVal / maxHourTotal * 34).clamp(3.0, 36.0) : 3.0;
-                          final double pH = maxHourTotal > 0 ? (pVal / maxHourTotal * 34).clamp(3.0, 36.0) : 3.0;
+                          final double sH = maxHourTotal > 0 ? (sVal / maxHourTotal * 28).clamp(3.0, 28.0) : 3.0;
+                          final double pH = maxHourTotal > 0 ? (pVal / maxHourTotal * 28).clamp(3.0, 28.0) : 3.0;
 
                           return _buildHourBar(labels[index], sH, pH);
                         }),
@@ -490,7 +490,7 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
               ),
 
               // Vertical divider
-              Container(width: 1, height: 80, color: cardBorder),
+              Container(width: 1, height: 86, color: cardBorder),
               const SizedBox(width: 12),
 
               // Right side: Donut Motor & details

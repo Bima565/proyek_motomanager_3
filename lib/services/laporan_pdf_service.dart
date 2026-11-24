@@ -592,8 +592,23 @@ class LaporanPdfService {
     final int bebanOperasional = (labaKotor * 0.205).round();
     final int labaBersih = math.max(0, labaKotor - bebanOperasional);
 
+    // Hitung pengeluaran pembelian stok di periode terpilih
+    int totalPengeluaranBeli = 0;
+    int countBeli = 0;
+    for (final p in allPembelian) {
+      if (p.status.toUpperCase() != 'BATAL') {
+        if (!p.dateTime.isBefore(startWindow) && !p.dateTime.isAfter(endWindow)) {
+          totalPengeluaranBeli += p.totalAmount;
+          countBeli++;
+        }
+      }
+    }
+    final int pendapatanBersih = totalPengeluaranBeli > 0
+        ? math.max(0, totalOmzet - totalPengeluaranBeli)
+        : labaBersih;
+
     final double marginKotor = totalOmzet > 0 ? (labaKotor / totalOmzet * 100) : 0.0;
-    final double marginBersih = totalOmzet > 0 ? (labaBersih / totalOmzet * 100) : 0.0;
+    final double marginBersih = totalOmzet > 0 ? (pendapatanBersih / totalOmzet * 100) : 0.0;
     final double partPercent = totalOmzet > 0 ? (totalOmzetPart / totalOmzet * 100) : 0.0;
     final double servisPercent = totalOmzet > 0 ? (totalOmzetJasa / totalOmzet * 100) : 0.0;
 
@@ -669,13 +684,11 @@ class LaporanPdfService {
             pw.SizedBox(height: 6),
             pw.Row(
               children: [
-                _buildPdfKpiCard('TOTAL OMZET', formatRupiah(totalOmzet), '${periodTrx.length} Transaksi', PdfColors.blue800),
+                _buildPdfKpiCard('OMZET', formatRupiah(totalOmzet), '${periodTrx.length} Penjualan', PdfColors.blue800),
                 pw.SizedBox(width: 8),
-                _buildPdfKpiCard('LABA KOTOR', formatRupiah(labaKotor), 'Margin ${marginKotor.toStringAsFixed(1)}%', PdfColors.teal800),
+                _buildPdfKpiCard('PENGELUARAN', formatRupiah(totalPengeluaranBeli), '$countBeli Beli Stok', PdfColors.red800),
                 pw.SizedBox(width: 8),
-                _buildPdfKpiCard('BEBAN OPERASIONAL', formatRupiah(bebanOperasional), 'Estimasi Toko 20.5%', PdfColors.orange800),
-                pw.SizedBox(width: 8),
-                _buildPdfKpiCard('LABA BERSIH (NET)', formatRupiah(labaBersih), 'Kas ${marginBersih.toStringAsFixed(1)}%', PdfColors.green800),
+                _buildPdfKpiCard('PENDAPATAN', formatRupiah(pendapatanBersih), 'Kas Bersih', PdfColors.green800),
               ],
             ),
             pw.SizedBox(height: 14),

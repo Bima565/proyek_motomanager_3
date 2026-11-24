@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../components/back_button_circle.dart';
 import '../../components/rupiah_formatter.dart';
 import '../../services/barang_service.dart';
+import '../../services/pembelian_service.dart';
 
 class TambahBarangPage extends StatefulWidget {
   const TambahBarangPage({super.key});
@@ -16,6 +17,8 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
   static const Color cardBg = Color(0xFF151821);
   static const Color cardBorder = Color(0xFF222634);
   static const Color accentRed = Color(0xFFFF1E27);
+  static const Color accentGreen = Color(0xFF22C55E);
+  static const Color accentBlue = Color(0xFF38BDF8);
   static const Color textWhite = Color(0xFFFFFFFF);
   static const Color textMuted = Color(0xFF94A3B8);
   static const Color textDim = Color(0xFF6B7280);
@@ -25,6 +28,8 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
   final TextEditingController _categoryController = TextEditingController();
   final TextEditingController _buyPriceController = TextEditingController();
   final TextEditingController _sellPriceController = TextEditingController();
+  final TextEditingController _stockController = TextEditingController(text: '1');
+  final TextEditingController _supplierController = TextEditingController(text: 'Toko Sumber Jaya');
 
   bool _isLoading = false;
 
@@ -39,6 +44,8 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
     _categoryController.dispose();
     _buyPriceController.dispose();
     _sellPriceController.dispose();
+    _stockController.dispose();
+    _supplierController.dispose();
     super.dispose();
   }
 
@@ -57,6 +64,13 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
             _sellPriceController.text.replaceAll(RegExp(r'[^0-9]'), ''),
           ) ??
           0;
+      final stockQty = int.tryParse(
+            _stockController.text.replaceAll(RegExp(r'[^0-9]'), ''),
+          ) ??
+          1;
+      final supplierName = _supplierController.text.trim().isNotEmpty
+          ? _supplierController.text.trim()
+          : 'Toko Sumber Jaya';
 
       final now = DateTime.now();
       final dateStr =
@@ -68,16 +82,43 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
         category: category,
         buyPrice: buyPrice,
         sellPrice: sellPrice,
-        stock: 0,
+        stock: stockQty,
         unit: 'Pcs',
         lastUpdated: dateStr,
       );
 
-      // Simpan kategori barang ke Firestore kategori/kategori_barang
+      // 1. Simpan kategori barang ke Firestore kategori/kategori_barang
       await BarangService().addCategoryHistory(category);
 
-      // Simpan data barang ke Firestore
+      // 2. Simpan data barang ke Firestore master_barang
       await BarangService().saveBarang(newBarang);
+
+      // 3. JIKA ADA STOK AWAL (> 0) DAN HARGA BELI (> 0), OTOMATIS CATAT PENGELUARAN KE DATABASE!
+      if (stockQty > 0 && buyPrice > 0) {
+        final totalExpense = buyPrice * stockQty;
+        final newPembelian = PembelianRecord(
+          code: PembelianService().generateBeliCode(),
+          dateTime: DateTime.now(),
+          buyerName: 'Sugeng Yulianto',
+          supplier: supplierName,
+          items: [
+            RestockItemModel(
+              id: newBarang.id,
+              name: name,
+              category: category,
+              buyPrice: buyPrice,
+              sellPrice: sellPrice,
+              quantity: stockQty,
+              unit: 'Pcs',
+            ),
+          ],
+          totalAmount: totalExpense,
+          status: 'LUNAS',
+          notes: 'Pengadaan awal barang baru: $name ($stockQty Pcs)',
+        );
+
+        await PembelianService().savePembelian(newPembelian);
+      }
 
       if (mounted) {
         Navigator.pop(context, newBarang);
@@ -375,24 +416,134 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
                           prefixText: 'Rp ',
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 18),
 
-                      // Info text
-                      const Row(
+                      // Field 5: Jumlah Stok Awal / Pembelian
+                      Row(
                         children: [
-                          Icon(
-                            Icons.info_outline_rounded,
-                            color: textDim,
-                            size: 14,
-                          ),
-                          SizedBox(width: 6),
                           Expanded(
-                            child: Text(
-                              'Stok awal otomatis bernilai 0 Pcs. Silakan lakukan Pengadaan & Restock untuk menambah jumlah stok fisik.',
-                              style: TextStyle(color: textDim, fontSize: 10.5),
+                            flex: 5,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Jumlah Stok Beli',
+                                  style: TextStyle(
+                                    color: textMuted,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: _stockController,
+                                  keyboardType: TextInputType.number,
+                                  style: const TextStyle(color: textWhite, fontSize: 13),
+                                  validator: (val) {
+                                    if (val == null || val.trim().isEmpty) {
+                                      return 'Stok wajib diisi';
+                                    }
+                                    final parsed = int.tryParse(val.replaceAll(RegExp(r'[^0-9]'), ''));
+                                    if (parsed == null || parsed < 0) {
+                                      return 'Stok tidak valid';
+                                    }
+                                    return null;
+                                  },
+                                  onChanged: (_) => setState(() {}),
+                                  decoration: _buildInputDecoration('1', suffixText: 'Pcs'),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            flex: 6,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Toko / Pemasok (Supplier)',
+                                  style: TextStyle(
+                                    color: textMuted,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: _supplierController,
+                                  style: const TextStyle(color: textWhite, fontSize: 13),
+                                  decoration: _buildInputDecoration('Toko Sumber Jaya'),
+                                ),
+                              ],
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 18),
+
+                      // Box Rekap Biaya Pengeluaran Pembelian Stok Baru
+                      Builder(
+                        builder: (context) {
+                          final buyPrice = int.tryParse(
+                                _buyPriceController.text.replaceAll(RegExp(r'[^0-9]'), ''),
+                              ) ??
+                              0;
+                          final stockQty = int.tryParse(
+                                _stockController.text.replaceAll(RegExp(r'[^0-9]'), ''),
+                              ) ??
+                              1;
+                          final totalBiaya = buyPrice * stockQty;
+
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: totalBiaya > 0 ? const Color(0xFF1E1418) : const Color(0xFF12151D),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: totalBiaya > 0 ? const Color(0xFF5A1E27) : cardBorder,
+                                width: 1.2,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  totalBiaya > 0 ? Icons.shopping_bag_rounded : Icons.info_outline_rounded,
+                                  color: totalBiaya > 0 ? const Color(0xFFF87171) : textDim,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        totalBiaya > 0
+                                            ? 'Pengeluaran Beli: ${formatRupiah(totalBiaya)}'
+                                            : 'Total Pengeluaran: Rp 0',
+                                        style: TextStyle(
+                                          color: totalBiaya > 0 ? const Color(0xFFF87171) : textWhite,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        totalBiaya > 0
+                                            ? 'Otomatis masuk ke Box Pengeluaran & mengurangi laba di Laporan Keuangan.'
+                                            : 'Masukkan harga beli & jumlah stok untuk mencatat uang pengeluaran.',
+                                        style: TextStyle(
+                                          color: totalBiaya > 0 ? textMuted : textDim,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -440,13 +591,19 @@ class _TambahBarangPageState extends State<TambahBarangPage> {
     );
   }
 
-  InputDecoration _buildInputDecoration(String hint, {String? prefixText}) {
+  InputDecoration _buildInputDecoration(String hint, {String? prefixText, String? suffixText}) {
     return InputDecoration(
       hintText: hint,
       prefixText: prefixText,
       prefixStyle: const TextStyle(
         color: textWhite,
         fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+      suffixText: suffixText,
+      suffixStyle: const TextStyle(
+        color: textMuted,
+        fontSize: 12,
         fontWeight: FontWeight.w600,
       ),
       hintStyle: const TextStyle(color: textDim, fontSize: 12),

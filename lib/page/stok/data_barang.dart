@@ -3,6 +3,7 @@ import '../../components/back_button_circle.dart';
 import '../../components/moto_bottom_nav.dart';
 import '../../components/rupiah_formatter.dart';
 import '../../services/barang_service.dart';
+import '../../services/pembelian_service.dart';
 import '../beranda.dart';
 import 'tambah_barang.dart';
 
@@ -668,6 +669,7 @@ class _DataBarangPageState extends State<DataBarangPage> {
     final nameCtrl = TextEditingController(text: item.name);
     final buyPriceCtrl = TextEditingController(text: formatRibuan(item.buyPrice));
     final sellPriceCtrl = TextEditingController(text: formatRibuan(item.sellPrice));
+    final tambahStokCtrl = TextEditingController(text: '0');
     String selectedCat = item.category;
 
     final barangs = BarangService().barangsNotifier.value;
@@ -787,7 +789,64 @@ class _DataBarangPageState extends State<DataBarangPage> {
                 ],
               ),
               const SizedBox(height: 10),
+
+              // Beli Tambah Stok Fisik & Estimasi Biaya
+              Row(
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Beli Tambah Stok', style: TextStyle(color: textMuted, fontSize: 11)),
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: tambahStokCtrl,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: textWhite, fontSize: 13),
+                          decoration: _buildInputDeco('0', suffix: 'Pcs'),
+                          onChanged: (_) => setModalState(() {}),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 6,
+                    child: Builder(builder: (context) {
+                      final buy = int.tryParse(buyPriceCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? item.buyPrice;
+                      final addQty = int.tryParse(tambahStokCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                      final totalBeli = buy * addQty;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Biaya Beli Stok', style: TextStyle(color: textMuted, fontSize: 11)),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: totalBeli > 0 ? const Color(0xFF22161A) : bgDark,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: totalBeli > 0 ? const Color(0xFF5A1E27) : cardBorder),
+                            ),
+                            child: Text(
+                              totalBeli > 0 ? formatRupiah(totalBeli) : 'Rp 0',
+                              style: TextStyle(
+                                color: totalBeli > 0 ? const Color(0xFFF87171) : textDim,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
+                  ),
+                ],
+              ),
               const SizedBox(height: 10),
+
               const Text('Kategori Barang', style: TextStyle(color: textMuted, fontSize: 11)),
               const SizedBox(height: 4),
               Container(
@@ -844,6 +903,8 @@ class _DataBarangPageState extends State<DataBarangPage> {
                         if (n.isEmpty) return;
                         final buy = int.tryParse(buyPriceCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? item.buyPrice;
                         final sell = int.tryParse(sellPriceCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? item.sellPrice;
+                        final tambahQty = int.tryParse(tambahStokCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                        final newStock = item.stock + tambahQty;
 
                         final updated = BarangModel(
                           id: item.id,
@@ -851,18 +912,48 @@ class _DataBarangPageState extends State<DataBarangPage> {
                           category: selectedCat,
                           buyPrice: buy,
                           sellPrice: sell,
-                          stock: item.stock,
+                          stock: newStock,
                           unit: item.unit,
                           lastUpdated: 'Diedit ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
                         );
 
                         Navigator.pop(ctx);
                         await BarangService().saveBarang(updated);
+
+                        // Jika ada penambahan stok beli, otomatis catat transaksi pengeluaran
+                        if (tambahQty > 0 && buy > 0) {
+                          final newPembelian = PembelianRecord(
+                            code: PembelianService().generateBeliCode(),
+                            dateTime: DateTime.now(),
+                            buyerName: 'Sugeng Yulianto',
+                            supplier: 'Toko Sumber Jaya',
+                            items: [
+                              RestockItemModel(
+                                id: item.id,
+                                name: n,
+                                category: selectedCat,
+                                buyPrice: buy,
+                                sellPrice: sell,
+                                quantity: tambahQty,
+                                unit: item.unit,
+                              ),
+                            ],
+                            totalAmount: buy * tambahQty,
+                            status: 'LUNAS',
+                            notes: 'Restock barang: $n (+$tambahQty Pcs)',
+                          );
+                          await PembelianService().savePembelian(newPembelian);
+                        }
+
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               backgroundColor: const Color(0xFF143322),
-                              content: Text('Barang "$n" berhasil diperbarui!'),
+                              content: Text(
+                                tambahQty > 0
+                                    ? 'Barang "$n" diperbarui (+stok $tambahQty Pcs dicatat ke Pengeluaran)!'
+                                    : 'Barang "$n" berhasil diperbarui!',
+                              ),
                             ),
                           );
                         }
