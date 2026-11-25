@@ -188,21 +188,19 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    // Inisialisasi pintar: sinkronkan ke tanggal transaksi terbaru di database jika hari ini belum ada data
+    // Inisialisasi pintar: hanya geser ke tanggal transaksi terbaru jika 30 hari terakhir benar-benar kosong
     if (!_hasInitializedDates && hasAnyData) {
       _hasInitializedDates = true;
-      final bool hasToday = validTrx.any((t) =>
-              t.dateTime.year == now.year &&
-              t.dateTime.month == now.month &&
-              t.dateTime.day == now.day) ||
+      final defaultStart = today.subtract(const Duration(days: 29));
+      final defaultEnd = DateTime(today.year, today.month, today.day, 23, 59, 59, 999);
+      final bool hasRecentWindow = validTrx.any((t) =>
+              !t.dateTime.isBefore(defaultStart) && !t.dateTime.isAfter(defaultEnd)) ||
           allPembelian.any((p) =>
-              p.dateTime.year == now.year &&
-              p.dateTime.month == now.month &&
-              p.dateTime.day == now.day);
+              !p.dateTime.isBefore(defaultStart) && !p.dateTime.isAfter(defaultEnd));
 
-      if (hasToday) {
+      if (hasRecentWindow) {
         _endDate = today;
-        _startDate = _endDate.subtract(const Duration(days: 29));
+        _startDate = defaultStart;
       } else {
         DateTime? latestDate;
         if (validTrx.isNotEmpty) {
@@ -1568,52 +1566,60 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
     final int endMonth = _selectedSemester == 1 ? 6 : 12;
     final List<String> displayMonths = allMonthNames.sublist(startMonth - 1, endMonth);
 
-    // Hitung pemasukan omzet & laba bersih (keuntungan) per bulan untuk tahun terpilih
+    // Hitung pemasukan omzet & laba bersih (keuntungan) per bulan dengan rumus identik dengan Portofolio Keuangan
     final Map<int, int> monthlyKotor = {};
     final Map<int, int> monthlyBersih = {};
+    final Map<int, int> monthlyOmzetPart = {};
+    final Map<int, int> monthlyOmzetJasa = {};
+    final Map<int, int> monthlyHppPart = {};
+    final Map<int, int> monthlyBeli = {};
     for (int m = 1; m <= 12; m++) {
       monthlyKotor[m] = 0;
       monthlyBersih[m] = 0;
+      monthlyOmzetPart[m] = 0;
+      monthlyOmzetJasa[m] = 0;
+      monthlyHppPart[m] = 0;
+      monthlyBeli[m] = 0;
     }
 
     for (final trx in validTrx) {
       if (trx.dateTime.year == _selectedTrenYear) {
         final m = trx.dateTime.month;
-        int omzetPart = 0;
-        int omzetJasa = 0;
-        int hppPart = 0;
         for (final item in trx.items) {
           final bool isJasa = item.isService == true ||
               item.category.toLowerCase().contains('jasa') ||
               item.category.toLowerCase().contains('servis');
           if (isJasa) {
-            omzetJasa += item.price * item.quantity;
+            monthlyOmzetJasa[m] = (monthlyOmzetJasa[m] ?? 0) + item.price * item.quantity;
           } else {
-            omzetPart += item.price * item.quantity;
+            monthlyOmzetPart[m] = (monthlyOmzetPart[m] ?? 0) + item.price * item.quantity;
             final buyPrice = _findPartBuyPrice(item, allBarang, allPembelian);
-            hppPart += buyPrice * item.quantity;
+            monthlyHppPart[m] = (monthlyHppPart[m] ?? 0) + buyPrice * item.quantity;
           }
         }
-        final untungPart = math.max(0, omzetPart - hppPart);
-        final untungJasa = omzetJasa;
-        final kotor = untungPart + untungJasa;
-        final operasional = (kotor * 0.205).round();
-        final bersih = math.max(0, kotor - operasional);
-
-        // Omzet kotor tetap (belum dikurangi biaya)
-        monthlyKotor[m] = (monthlyKotor[m] ?? 0) + (omzetPart + omzetJasa);
-        monthlyBersih[m] = (monthlyBersih[m] ?? 0) + bersih;
       }
     }
 
-    // Alur bisnis: Keuntungan berkurang jika ada pembelian sparepart untuk restock di bulan tersebut
     for (final p in allPembelian) {
       if (p.status.toUpperCase() != 'BATAL' && p.dateTime.year == _selectedTrenYear) {
         final m = p.dateTime.month;
-        if (monthlyBersih.containsKey(m)) {
-          monthlyBersih[m] = math.max(0, (monthlyBersih[m] ?? 0) - p.totalAmount);
-        }
+        monthlyBeli[m] = (monthlyBeli[m] ?? 0) + p.totalAmount;
       }
+    }
+
+    for (int m = 1; m <= 12; m++) {
+      final int omzetPartM = monthlyOmzetPart[m] ?? 0;
+      final int omzetJasaM = monthlyOmzetJasa[m] ?? 0;
+      final int hppPartM = monthlyHppPart[m] ?? 0;
+      final int beliM = monthlyBeli[m] ?? 0;
+
+      final int untungPartM = math.max(0, omzetPartM - hppPartM);
+      final int labaKotorM = untungPartM + omzetJasaM;
+      final int operasionalM = (labaKotorM * 0.205).round();
+      final int baseKeuntunganM = math.max(0, labaKotorM - operasionalM);
+
+      monthlyKotor[m] = omzetPartM + omzetJasaM;
+      monthlyBersih[m] = math.max(0, baseKeuntunganM - beliM);
     }
 
     final now = DateTime.now();
@@ -1670,35 +1676,43 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Header Row (Judul, Dropdown Tahun, Detail) - Rapi & Tidak Berdesakan
+          // 1. Header Row (Judul, Dropdown Tahun, Detail) - Rapi & Bebas Overflow
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'Tren Laba Bulanan',
-                    style: TextStyle(
-                      color: textWhite,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.bold,
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Tren Laba Bulanan',
+                      style: TextStyle(
+                        color: textWhite,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    '(Omzet vs Keuntungan Bersih)',
-                    style: TextStyle(
-                      color: textDim,
-                      fontSize: 10,
+                    SizedBox(height: 2),
+                    Text(
+                      '(Omzet vs Keuntungan Bersih)',
+                      style: TextStyle(
+                        color: textDim,
+                        fontSize: 10,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildTrenLabaDropdown(),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -1847,8 +1861,10 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.touch_app_rounded, color: accentBlue, size: 14),
                           const SizedBox(width: 6),
@@ -1862,26 +1878,31 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                           ),
                         ],
                       ),
-                      Row(
-                        children: [
-                          Text(
-                            'Omzet: ${formatRupiah(monthlyKotor[tappedRealMonth] ?? 0)}',
-                            style: const TextStyle(
-                              color: accentBlue,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 8,
+                          runSpacing: 2,
+                          children: [
+                            Text(
+                              'Omzet: ${formatRupiah(monthlyKotor[tappedRealMonth] ?? 0)}',
+                              style: const TextStyle(
+                                color: accentBlue,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Keuntungan: ${formatRupiah(monthlyBersih[tappedRealMonth] ?? 0)}',
-                            style: const TextStyle(
-                              color: accentGreen,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                            Text(
+                              'Keuntungan: ${formatRupiah(monthlyBersih[tappedRealMonth] ?? 0)}',
+                              style: const TextStyle(
+                                color: accentGreen,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -2077,15 +2098,15 @@ class _TrenLabaBulananPainter extends CustomPainter {
     }
 
     // 2. Skala Maksimum Y
-    // Menggunakan skala target kapasitas bulanan bengkel (default Rp 3.000.000).
-    // Jika nominal kecil (misal 140k = 0.14), nilainya di bawah 10% (0.14 / 3.0 = 4.6%)
-    // Sesuai permintaan: jika nominal kecil berada di bawah 10%, tidak melonjak ke 50%!
+    // Menggunakan skala target kapasitas bulanan bengkel (default Rp 10.000.000 / 10 Juta).
+    // Agar kenaikan titik garis bertahap sesuai nominal income:
+    // misal 500rb = 5%, 1jt = 10%, 2jt = 20%, 5jt = 50% (tidak langsung melonjak ke 50%).
     double maxData = 0.0;
     for (int i = 0; i < maxMonthToDraw && i < labaKotorValues.length; i++) {
       if (labaKotorValues[i] > maxData) maxData = labaKotorValues[i];
       if (labaBersihValues[i] > maxData) maxData = labaBersihValues[i];
     }
-    const double benchmarkCapacity = 3.0; // Kapasitas acuan Rp 3.000.000
+    const double benchmarkCapacity = 10.0; // Kapasitas acuan Rp 10.000.000
     final double maxVal = math.max(benchmarkCapacity, maxData * 1.25);
     const double minVal = 0.0;
 

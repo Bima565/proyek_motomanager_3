@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'barang_service.dart';
@@ -195,7 +196,15 @@ class PembelianService {
   }
 
   String generateBeliCode() {
-    final nextNumber = pembelianList.length + 1;
+    int maxNum = 0;
+    for (final p in pembelianList) {
+      final match = RegExp(r'#BELI-(\d+)').firstMatch(p.code);
+      if (match != null) {
+        final numVal = int.tryParse(match.group(1) ?? '0') ?? 0;
+        if (numVal > maxNum) maxNum = numVal;
+      }
+    }
+    final nextNumber = math.max(maxNum + 1, pembelianList.length + 1);
     final numStr = nextNumber.toString().padLeft(3, '0');
     return '#BELI-$numStr';
   }
