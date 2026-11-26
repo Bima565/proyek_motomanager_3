@@ -46,6 +46,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
   late DateTime _startDate;
   late DateTime _endDate;
   bool _hasInitializedDates = false;
+  bool _userPickedStartDate = false;
 
   @override
   void initState() {
@@ -78,14 +79,25 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
     setState(() {
       _selectedFilter = label;
       _tappedDayIndex = null;
-      final now = DateTime.now();
-      _endDate = DateTime(now.year, now.month, now.day);
-      if (label == '1 Hari') {
-        _startDate = _endDate;
-      } else if (label == '7 Hari') {
-        _startDate = _endDate.subtract(const Duration(days: 6));
-      } else if (label == '30 Hari') {
-        _startDate = _endDate.subtract(const Duration(days: 29));
+      if (_userPickedStartDate) {
+        // Jika user baru memilih tanggal awal (misal 01/11/2026), hitung maju dari _startDate
+        if (label == '1 Hari') {
+          _endDate = _startDate;
+        } else if (label == '7 Hari') {
+          _endDate = _startDate.add(const Duration(days: 6));
+        } else if (label == '30 Hari') {
+          _endDate = _startDate.add(const Duration(days: 29));
+        }
+      } else {
+        final now = DateTime.now();
+        _endDate = DateTime(now.year, now.month, now.day);
+        if (label == '1 Hari') {
+          _startDate = _endDate;
+        } else if (label == '7 Hari') {
+          _startDate = _endDate.subtract(const Duration(days: 6));
+        } else if (label == '30 Hari') {
+          _startDate = _endDate.subtract(const Duration(days: 29));
+        }
       }
     });
   }
@@ -219,22 +231,6 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
       }
     }
 
-    // Auto-update jendela filter jika ada transaksi/pembelian baru yang dibuat hari ini atau lebih baru dari _endDate
-    if (allPembelian.isNotEmpty) {
-      final latestBeli = allPembelian.first.dateTime;
-      final latestBeliDay = DateTime(latestBeli.year, latestBeli.month, latestBeli.day);
-      if (latestBeliDay.isAfter(_endDate)) {
-        _endDate = latestBeliDay;
-      }
-    }
-    if (validTrx.isNotEmpty) {
-      final latestTrx = validTrx.first.dateTime;
-      final latestTrxDay = DateTime(latestTrx.year, latestTrx.month, latestTrx.day);
-      if (latestTrxDay.isAfter(_endDate)) {
-        _endDate = latestTrxDay;
-      }
-    }
-
     // Filter transaksi sesuai rentang tanggal (_startDate s/d _endDate)
     final startWindow = DateTime(_startDate.year, _startDate.month, _startDate.day, 0, 0, 0);
     final endWindow = DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59, 999);
@@ -306,7 +302,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
     final double partPercent = omzetTotal > 0 ? (displayedOmzetPart / omzetTotal) : (hasAnyData ? 0.0 : 0.55);
     final double servisPercent = omzetTotal > 0 ? (displayedOmzetJasa / omzetTotal) : (hasAnyData ? 0.0 : 0.45);
 
-    // 2. Chart Aktivitas Pendapatan Harian (Sen - Min) tetap menggunakan validTrx keseluruhan (Scope Mingguan Umum)
+    // 2. Chart Aktivitas Pendapatan Harian (Sen - Min) sinkron dengan box tanggalan (_startDate s/d _endDate)
     final Map<int, Map<String, int>> dailyStats = {
       1: {'servis': 0, 'part': 0, 'total': 0}, // Sen
       2: {'servis': 0, 'part': 0, 'total': 0}, // Sel
@@ -317,14 +313,33 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
       7: {'servis': 0, 'part': 0, 'total': 0}, // Min
     };
 
+    final bool isSingleDayFilter =
+        _startDate.year == _endDate.year &&
+        _startDate.month == _endDate.month &&
+        _startDate.day == _endDate.day;
+    final DateTime weekMonday = _endDate.subtract(Duration(days: _endDate.weekday - 1));
+    final DateTime weekSunday = weekMonday.add(const Duration(days: 6));
+
+    // Jika mode '1 Hari', tampilkan minggu berjalan (Sen-Min) dari tanggal terpilih agar perbandingan harian tetap terlihat
+    final List<TransaksiPenjualanModel> chartSourceTrx = isSingleDayFilter
+        ? validTrx.where((t) {
+            final startW = DateTime(weekMonday.year, weekMonday.month, weekMonday.day, 0, 0, 0);
+            final endW = DateTime(weekSunday.year, weekSunday.month, weekSunday.day, 23, 59, 59, 999);
+            return !t.dateTime.isBefore(startW) && !t.dateTime.isAfter(endW);
+          }).toList()
+        : filteredTrx;
+
     if (hasAnyData) {
-      for (final trx in validTrx) {
+      for (final trx in chartSourceTrx) {
         final dayIndex = trx.dateTime.weekday;
         if (dailyStats.containsKey(dayIndex)) {
           int s = 0;
           int p = 0;
           for (final item in trx.items) {
-            if (item.isService) {
+            final bool isJasa = item.isService == true ||
+                item.category.toLowerCase().contains('jasa') ||
+                item.category.toLowerCase().contains('servis');
+            if (isJasa) {
               s += item.price * item.quantity;
             } else {
               p += item.price * item.quantity;
@@ -450,22 +465,55 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Aktivitas Pendapatan Harian + Legend (Tren Omzet di atas chart dihilangkan sesuai permintaan)
+          // Aktivitas Pendapatan Harian + Periode Sinkron + Legend
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Aktivitas Pendapatan Harian',
-                style: TextStyle(
-                  color: textWhite,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Aktivitas Pendapatan Harian',
+                      style: TextStyle(
+                        color: textWhite,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Builder(
+                      builder: (context) {
+                        final bool isSingleDay =
+                            _startDate.year == _endDate.year &&
+                            _startDate.month == _endDate.month &&
+                            _startDate.day == _endDate.day;
+                        final monday = _endDate.subtract(Duration(days: _endDate.weekday - 1));
+                        final sunday = monday.add(const Duration(days: 6));
+                        final String periodInfo = isSingleDay
+                            ? 'Minggu ${monday.day}/${monday.month} – ${sunday.day}/${sunday.month} (Fokus ${dayNames[_endDate.weekday]})'
+                            : 'Periode ${_startDate.day}/${_startDate.month} – ${_endDate.day}/${_endDate.month}';
+                        return Text(
+                          periodInfo,
+                          style: const TextStyle(
+                            color: textDim,
+                            fontSize: 10,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(width: 8),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildLegendDot(accentRed, 'Servis'),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   _buildLegendDot(accentBlue, 'Part'),
                 ],
               ),
@@ -512,7 +560,14 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                 final double sH = maxVal > 0 ? (sVal / maxVal * 55).clamp(4.0, 65.0) : 4.0;
                 final double pH = maxVal > 0 ? (pVal / maxVal * 65).clamp(4.0, 70.0) : 4.0;
                 final bool isPeak = tot == maxVal && tot > 0;
-                final String valText = tot > 0 ? '${(tot / 1000).round()}k' : '0k';
+                final bool isSingleDay =
+                    _startDate.year == _endDate.year &&
+                    _startDate.month == _endDate.month &&
+                    _startDate.day == _endDate.day;
+                final bool isFocusedDay = isSingleDay && dayNum == _endDate.weekday;
+                final String valText = tot >= 1000000
+                    ? '${(tot / 1000000).toStringAsFixed(1)}jt'
+                    : (tot > 0 ? '${(tot / 1000).round()}k' : '0k');
                 final bool isTapped = _tappedDayIndex == dayNum;
 
                 return GestureDetector(
@@ -531,7 +586,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                     valText,
                     sH,
                     pH,
-                    isTapped || (_tappedDayIndex == null && (isPeak || dayLabel == 'Sab')),
+                    isTapped || (_tappedDayIndex == null && (isFocusedDay || (!isSingleDay && isPeak))),
                     isSelected: isTapped,
                   ),
                 );
@@ -539,56 +594,112 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
             ),
           ),
 
-          // Detail Card saat Bar Harian Ditekan
+          // Detail Card saat Bar Harian Ditekan (lengkap dengan tanggal pada periode tersebut)
           if (_tappedDayIndex != null) ...[
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E2433),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: accentYellow.withValues(alpha: 0.5)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.touch_app_rounded, color: accentYellow, size: 14),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${dayNames[_tappedDayIndex]}: ${formatRupiah(dailyStats[_tappedDayIndex]?['total'] ?? 0)}',
-                          style: const TextStyle(
-                            color: textWhite,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            '(Servis: ${formatRupiah(dailyStats[_tappedDayIndex]?['servis'] ?? 0)} • Part: ${formatRupiah(dailyStats[_tappedDayIndex]?['part'] ?? 0)})',
-                            style: const TextStyle(
-                              color: textMuted,
-                              fontSize: 10,
+            Builder(
+              builder: (context) {
+                const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+                final bool isSingleDay =
+                    _startDate.year == _endDate.year &&
+                    _startDate.month == _endDate.month &&
+                    _startDate.day == _endDate.day;
+                final DateTime rangeStart = isSingleDay
+                    ? _endDate.subtract(Duration(days: _endDate.weekday - 1))
+                    : DateTime(_startDate.year, _startDate.month, _startDate.day);
+                final DateTime rangeEnd = isSingleDay
+                    ? rangeStart.add(const Duration(days: 6))
+                    : DateTime(_endDate.year, _endDate.month, _endDate.day);
+
+                final List<DateTime> matchingDates = [];
+                DateTime cursor = rangeStart;
+                int guard = 0;
+                while (!cursor.isAfter(rangeEnd) && guard < 120) {
+                  if (cursor.weekday == _tappedDayIndex) {
+                    matchingDates.add(cursor);
+                  }
+                  cursor = cursor.add(const Duration(days: 1));
+                  guard++;
+                }
+
+                String dateLabel = dayNames[_tappedDayIndex] ?? '';
+                if (matchingDates.length == 1) {
+                  final d = matchingDates.first;
+                  dateLabel = '${dayNames[_tappedDayIndex]}, ${d.day} ${shortMonths[d.month - 1]} ${d.year}';
+                } else if (matchingDates.length > 1) {
+                  final sameMonth = matchingDates.every((d) => d.month == matchingDates.first.month && d.year == matchingDates.first.year);
+                  if (sameMonth) {
+                    final daysStr = matchingDates.map((d) => d.day.toString()).join(', ');
+                    final mStr = shortMonths[matchingDates.first.month - 1];
+                    dateLabel = '${dayNames[_tappedDayIndex]} ($daysStr $mStr ${matchingDates.first.year})';
+                  } else {
+                    final datesStr = matchingDates.map((d) => '${d.day} ${shortMonths[d.month - 1]}').join(', ');
+                    dateLabel = '${dayNames[_tappedDayIndex]} ($datesStr)';
+                  }
+                }
+
+                final int totVal = dailyStats[_tappedDayIndex]?['total'] ?? 0;
+                final int srvVal = dailyStats[_tappedDayIndex]?['servis'] ?? 0;
+                final int prtVal = dailyStats[_tappedDayIndex]?['part'] ?? 0;
+
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E2433),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: accentYellow.withValues(alpha: 0.5)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.calendar_today_rounded, color: accentYellow, size: 13),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              dateLabel,
+                              style: const TextStyle(
+                                color: textWhite,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
+                          const SizedBox(width: 8),
+                          Text(
+                            formatRupiah(totVal),
+                            style: const TextStyle(
+                              color: accentYellow,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _tappedDayIndex = null;
+                              });
+                            },
+                            child: const Icon(Icons.close_rounded, color: textDim, size: 14),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Jasa Servis: ${formatRupiah(srvVal)}  •  Sparepart: ${formatRupiah(prtVal)}',
+                        style: const TextStyle(
+                          color: textMuted,
+                          fontSize: 10,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _tappedDayIndex = null;
-                      });
-                    },
-                    child: const Icon(Icons.close_rounded, color: textDim, size: 14),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ] else ...[
             const SizedBox(height: 8),
@@ -723,6 +834,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                   );
                   if (picked != null) {
                     setState(() {
+                      _userPickedStartDate = true;
                       _startDate = DateTime(picked.year, picked.month, picked.day);
                       if (_startDate.isAfter(_endDate)) {
                         _endDate = _startDate;
@@ -752,6 +864,7 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
                   );
                   if (picked != null) {
                     setState(() {
+                      _userPickedStartDate = false;
                       _endDate = DateTime(picked.year, picked.month, picked.day);
                       if (_endDate.isBefore(_startDate)) {
                         _startDate = _endDate;
@@ -925,11 +1038,23 @@ class _LaporanPendapatanPageState extends State<LaporanPendapatanPage> {
             ),
             GestureDetector(
               onTap: () {
+                DateTime targetDetailDate = _endDate;
+                if (_tappedDayIndex != null) {
+                  DateTime cursor = _endDate;
+                  for (int i = 0; i < 7; i++) {
+                    if (cursor.weekday == _tappedDayIndex) {
+                      targetDetailDate = cursor;
+                      break;
+                    }
+                    cursor = cursor.subtract(const Duration(days: 1));
+                  }
+                }
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => RincianTransaksiHarianPage(
                       userData: widget.userData,
+                      initialDate: targetDetailDate,
                     ),
                   ),
                 );

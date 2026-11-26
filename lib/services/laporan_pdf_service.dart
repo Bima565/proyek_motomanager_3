@@ -603,9 +603,7 @@ class LaporanPdfService {
         }
       }
     }
-    final int pendapatanBersih = totalPengeluaranBeli > 0
-        ? math.max(0, totalOmzet - totalPengeluaranBeli)
-        : labaBersih;
+    final int pendapatanBersih = math.max(0, labaBersih - totalPengeluaranBeli);
 
     final double marginKotor = totalOmzet > 0 ? (labaKotor / totalOmzet * 100) : 0.0;
     final double marginBersih = totalOmzet > 0 ? (pendapatanBersih / totalOmzet * 100) : 0.0;
@@ -684,11 +682,11 @@ class LaporanPdfService {
             pw.SizedBox(height: 6),
             pw.Row(
               children: [
-                _buildPdfKpiCard('OMZET', formatRupiah(totalOmzet), '${periodTrx.length} Penjualan', PdfColors.blue800),
+                _buildPdfKpiCard('OMZET KOTOR', formatRupiah(totalOmzet), '${periodTrx.length} Penjualan', PdfColors.blue800),
                 pw.SizedBox(width: 8),
-                _buildPdfKpiCard('PENGELUARAN', formatRupiah(totalPengeluaranBeli), '$countBeli Beli Stok', PdfColors.red800),
+                _buildPdfKpiCard('PENGELUARAN STOK', formatRupiah(totalPengeluaranBeli), '$countBeli Pembelian', PdfColors.red800),
                 pw.SizedBox(width: 8),
-                _buildPdfKpiCard('PENDAPATAN', formatRupiah(pendapatanBersih), 'Kas Bersih', PdfColors.green800),
+                _buildPdfKpiCard('KEUNTUNGAN BERSIH', formatRupiah(pendapatanBersih), 'Kas Bersih', PdfColors.green800),
               ],
             ),
             pw.SizedBox(height: 14),
@@ -717,9 +715,9 @@ class LaporanPdfService {
                           children: [
                             _buildPdfRowDetail('Jasa Servis', formatRupiah(totalOmzetJasa), '$countServis servis (${servisPercent.toStringAsFixed(1)}%)'),
                             pw.Divider(thickness: 0.5, color: PdfColors.grey300),
-                            _buildPdfRowDetail('Sparepart (Omzet)', formatRupiah(totalOmzetPart), '$countPart pcs (${partPercent.toStringAsFixed(1)}%)'),
-                            _buildPdfRowDetail('Modal Beli Part (HPP)', formatRupiah(totalHppPart), 'Biaya Kulakan'),
-                            _buildPdfRowDetail('Keuntungan Bersih Part', formatRupiah(keuntunganPart), 'Harga Jual - Modal'),
+                            _buildPdfRowDetail('Penjualan Sparepart', formatRupiah(totalOmzetPart), '$countPart pcs (${partPercent.toStringAsFixed(1)}%)'),
+                            _buildPdfRowDetail('Modal Sparepart Terjual', formatRupiah(totalHppPart), 'Biaya Kulakan'),
+                            _buildPdfRowDetail('Laba Penjualan Sparepart', formatRupiah(keuntunganPart), 'Harga Jual - Modal'),
                           ],
                         ),
                       ),

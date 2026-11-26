@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import '../../components/custom_calendar_dialog.dart';
 import '../../components/rupiah_formatter.dart';
 import '../../services/transaksi_service.dart';
 
 /// Screen 10 - (FR09) Rincian Transaksi Harian (Terintegrasi Cloud Firestore)
 class RincianTransaksiHarianPage extends StatefulWidget {
   final Map<String, dynamic>? userData;
+  final DateTime? initialDate;
 
-  const RincianTransaksiHarianPage({super.key, this.userData});
+  const RincianTransaksiHarianPage({super.key, this.userData, this.initialDate});
 
   @override
   State<RincianTransaksiHarianPage> createState() => _RincianTransaksiHarianPageState();
@@ -24,22 +26,29 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
   static const Color textMuted = Color(0xFF94A3B8);
   static const Color textDim = Color(0xFF64748B);
 
-  String _selectedDay = 'Sabtu';
+  late DateTime _selectedDate;
 
-  static const Map<String, int> _dayToWeekday = {
-    'Senin': 1,
-    'Selasa': 2,
-    'Rabu': 3,
-    'Kamis': 4,
-    'Jumat': 5,
-    'Sabtu': 6,
-    'Minggu': 7,
+  static const Map<int, String> _weekdayToName = {
+    1: 'Senin',
+    2: 'Selasa',
+    3: 'Rabu',
+    4: 'Kamis',
+    5: 'Jumat',
+    6: 'Sabtu',
+    7: 'Minggu',
   };
 
   static const List<String> _namaBulanSingkat = [
     'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
     'Jul', 'Agu', 'Sept', 'Okt', 'Nov', 'Des'
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    final base = widget.initialDate ?? DateTime.now();
+    _selectedDate = DateTime(base.year, base.month, base.day);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,26 +61,18 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
             final allTrx = TransaksiService().transactions;
             final validTrx = allTrx.where((t) => t.status.toLowerCase() != 'batal').toList();
 
-            final targetWeekday = _dayToWeekday[_selectedDay] ?? 6;
-
-            // Ambil transaksi yang sesuai dengan hari yang dipilih
-            final dayTrx = validTrx.where((t) => t.dateTime.weekday == targetWeekday).toList();
+            // Ambil transaksi yang sesuai tepat dengan tanggal yang dipilih
+            final dayTrx = validTrx.where((t) =>
+                t.dateTime.year == _selectedDate.year &&
+                t.dateTime.month == _selectedDate.month &&
+                t.dateTime.day == _selectedDate.day).toList();
             final bool hasRealData = dayTrx.isNotEmpty;
 
-            // Cari tanggal yang relevan untuk subtitle header
-            DateTime targetDate;
-            if (hasRealData) {
-              targetDate = dayTrx.first.dateTime;
-            } else {
-              final now = DateTime.now();
-              final diff = targetWeekday - now.weekday;
-              targetDate = now.add(Duration(days: diff));
-            }
-
+            final String dayName = _weekdayToName[_selectedDate.weekday] ?? '';
             final String subtitleDate =
-                '$_selectedDay, ${targetDate.day} ${_namaBulanSingkat[targetDate.month - 1]} ${targetDate.year} • 08.00 - 17.00 WIB';
+                '$dayName, ${_selectedDate.day} ${_namaBulanSingkat[_selectedDate.month - 1]} ${_selectedDate.year}';
 
-            // 1. Kalkulasi Pendapatan Hari Tersebut
+            // 1. Kalkulasi Pendapatan Tanggal Tersebut (100% Real dari Firestore)
             int totalHarian = 0;
             int totalServisHarian = 0;
             int totalPartHarian = 0;
@@ -90,29 +91,28 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
               }
             }
 
-            // Fallback mock baseline jika database hari ini belum ada transaksi
-            final int displayTotal = hasRealData ? totalHarian : 140000;
-            final int displayServis = hasRealData ? totalServisHarian : 65000;
-            final int displayPart = hasRealData ? totalPartHarian : 75000;
-            final int displayMotorCount = hasRealData ? dayTrx.length : 5;
+            final int displayTotal = totalHarian;
+            final int displayServis = totalServisHarian;
+            final int displayPart = totalPartHarian;
+            final int displayMotorCount = dayTrx.length;
 
-            final int servisPct = displayTotal > 0 ? (displayServis / displayTotal * 100).round() : 46;
-            final int partPct = displayTotal > 0 ? (displayPart / displayTotal * 100).round() : 54;
+            final int servisPct = displayTotal > 0 ? (displayServis / displayTotal * 100).round() : 0;
+            final int partPct = displayTotal > 0 ? (100 - servisPct) : 0;
 
-            String kasirName = 'Sri Ekowati';
+            String kasirName = widget.userData?['nama_lengkap']?.toString() ??
+                widget.userData?['name']?.toString() ??
+                'Kasir';
             if (hasRealData && dayTrx.first.kasirName.isNotEmpty) {
               kasirName = dayTrx.first.kasirName;
-            } else if (widget.userData?['name'] != null && widget.userData!['name'].toString().isNotEmpty) {
-              kasirName = widget.userData!['name'].toString();
             }
 
-            // 2. Kalkulasi Data Bar Chart per 2 Jam (Jam 08, 10, 12, 14, 16)
+            // 2. Kalkulasi Data Bar Chart per Rentang Jam (Pagi s/d Malam)
             final hourBuckets = [
-              {'label': 'Jam\n08', 'start': 8, 'end': 10},
-              {'label': 'Jam\n10', 'start': 10, 'end': 12},
-              {'label': 'Jam\n12', 'start': 12, 'end': 14},
-              {'label': 'Jam\n14', 'start': 14, 'end': 16},
-              {'label': 'Jam\n16', 'start': 16, 'end': 18},
+              {'label': 'Jam\n08', 'start': 0, 'end': 11},
+              {'label': 'Jam\n11', 'start': 11, 'end': 14},
+              {'label': 'Jam\n14', 'start': 14, 'end': 17},
+              {'label': 'Jam\n17', 'start': 17, 'end': 20},
+              {'label': 'Jam\n20', 'start': 20, 'end': 24},
             ];
 
             int maxHourTotal = 1;
@@ -252,50 +252,35 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
                       );
                     })
                   else ...[
-                    // Mock baseline default bila data hari terpilih masih kosong
-                    _buildTransaksiItem(
-                      time: '08:45',
-                      paymentType: 'Tunai',
-                      total: 'Rp 35.000',
-                      customerName: 'Budi Santoso • Beat FI (AE 3912 BE)',
-                      servisDesc: 'Servis Ringan (15k)',
-                      partDesc: 'Part: Oli & Busi (20k)',
-                    ),
-                    const SizedBox(height: 10),
-                    _buildTransaksiItem(
-                      time: '10:15',
-                      paymentType: 'QRIS',
-                      total: 'Rp 45.000',
-                      customerName: 'Ahmad Fauzi • Vario 160 (AE 4921 KF)',
-                      servisDesc: 'Servis CVT (20k)',
-                      partDesc: 'Part: Kampas Rem (25k)',
-                    ),
-                    const SizedBox(height: 10),
-                    _buildTransaksiItem(
-                      time: '11:30',
-                      paymentType: 'Tunai',
-                      total: 'Rp 25.000',
-                      customerName: 'Ibu Sri Wahyuni • Mio M3 (AE 2481 RK)',
-                      servisDesc: 'Ganti Oli (10k)',
-                      partDesc: 'Part: Oli Mesin (15k)',
-                    ),
-                    const SizedBox(height: 10),
-                    _buildTransaksiItem(
-                      time: '14:10',
-                      paymentType: 'Tunai',
-                      total: 'Rp 20.000',
-                      customerName: 'Rudi Hartono • Supra X 125 (AE 5109 DA)',
-                      servisDesc: 'Servis: Stel Rem & Rantai (10k)',
-                      partDesc: 'Part: Rantai (10k)',
-                    ),
-                    const SizedBox(height: 10),
-                    _buildTransaksiItem(
-                      time: '16:00',
-                      paymentType: 'QRIS',
-                      total: 'Rp 15.000',
-                      customerName: 'Dian Pratama • NMAX (AE 6820 GL)',
-                      servisDesc: 'Tambal Tubeless (10k)',
-                      partDesc: 'Part: Cairan Ban (5k)',
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: cardBorder),
+                      ),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.receipt_long_outlined, color: textDim, size: 32),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Belum ada transaksi pada ${_selectedDate.day} ${_namaBulanSingkat[_selectedDate.month - 1]} ${_selectedDate.year}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: textWhite,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Ketuk tombol tanggal di pojok kanan atas untuk memilih tanggal lain.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: textDim, fontSize: 10.5),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ],
@@ -348,29 +333,41 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
             ],
           ),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cardBorder, width: 1),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedDay,
-              dropdownColor: cardBg,
-              icon: const Icon(Icons.arrow_drop_down, color: textDim, size: 16),
-              style: const TextStyle(
-                color: textWhite,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-              items: ['Sabtu', 'Jumat', 'Kamis', 'Rabu', 'Selasa', 'Senin', 'Minggu']
-                  .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                  .toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedDay = val);
-              },
+        GestureDetector(
+          onTap: () async {
+            final picked = await CustomCalendarDialog.show(
+              context,
+              initialDate: _selectedDate,
+            );
+            if (picked != null) {
+              setState(() {
+                _selectedDate = DateTime(picked.year, picked.month, picked.day);
+              });
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: cardBorder, width: 1),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.calendar_month_outlined, color: accentBlue, size: 14),
+                const SizedBox(width: 5),
+                Text(
+                  '${_selectedDate.day} ${_namaBulanSingkat[_selectedDate.month - 1]}',
+                  style: const TextStyle(
+                    color: textWhite,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                const Icon(Icons.arrow_drop_down, color: textDim, size: 16),
+              ],
             ),
           ),
         ),
@@ -446,17 +443,9 @@ class _RincianTransaksiHarianPageState extends State<RincianTransaksiHarianPage>
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: List.generate(5, (index) {
-                          final labels = ['Jam\n08', 'Jam\n10', 'Jam\n12', 'Jam\n14', 'Jam\n16'];
+                          final labels = ['Jam\n08', 'Jam\n11', 'Jam\n14', 'Jam\n17', 'Jam\n20'];
                           if (!hasRealData) {
-                            // Mock height default
-                            final mockH = [
-                              {'s': 16.0, 'p': 18.0},
-                              {'s': 24.0, 'p': 28.0},
-                              {'s': 14.0, 'p': 16.0},
-                              {'s': 16.0, 'p': 18.0},
-                              {'s': 14.0, 'p': 11.0},
-                            ];
-                            return _buildHourBar(labels[index], mockH[index]['s']!, mockH[index]['p']!);
+                            return _buildHourBar(labels[index], 3.0, 3.0);
                           }
 
                           final hData = calculatedHours[index];

@@ -78,7 +78,7 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
             final int startMonth = endMonth - 5;
 
             final String subtitlePeriode =
-                'Periode ${_namaBulanSingkat[startMonth - 1]} - ${_namaBulanSingkat[endMonth - 1]} $selectedYearInt • Basis UMR Madiun';
+                'Periode ${_namaBulanSingkat[startMonth - 1]} - ${_namaBulanSingkat[endMonth - 1]} $selectedYearInt • Rekap Bulanan';
 
             // Filter transaksi per bulan untuk tahun terpilih
             final Map<int, Map<String, int>> monthlyData = {};
@@ -128,7 +128,7 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
 
             // Hitung tren persentase (3 bulan pertama vs 3 bulan terakhir)
             String trendText = '▲ +17.0%';
-            String trendLabel = 'Tren Positif';
+            String trendLabel = 'Pemasukan Naik';
             if (hasAnyRealTrxInYear) {
               final firstHalf = (monthlyData[startMonth]?['total'] ?? 0) +
                   (monthlyData[startMonth + 1]?['total'] ?? 0) +
@@ -141,11 +141,17 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
                 final pct = (diff / firstHalf * 100);
                 if (diff >= 0) {
                   trendText = '▲ +${pct.toStringAsFixed(1)}%';
-                  trendLabel = 'Tren Positif';
+                  trendLabel = 'Pemasukan Naik';
                 } else {
                   trendText = '▼ ${pct.abs().toStringAsFixed(1)}%';
-                  trendLabel = 'Tren Menurun';
+                  trendLabel = 'Pemasukan Turun';
                 }
+              } else if (secondHalf > 0) {
+                trendText = 'Aktif';
+                trendLabel = 'Baru Berjalan';
+              } else {
+                trendText = '0.0%';
+                trendLabel = 'Belum Ada Transaksi';
               }
             }
 
@@ -189,20 +195,20 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
                       final prevM = m - 1;
                       final prevTot = (prevM >= 1) ? (monthlyData[prevM]?['total'] ?? 0) : 0;
 
-                      String compStr = 'Basis Awal';
+                      String compStr = 'Bulan Awal';
                       bool? isPos;
                       if (m > startMonth && prevTot > 0) {
                         final diff = tot - prevTot;
                         final double pct = (diff / prevTot * 100);
                         if (diff >= 0) {
-                          compStr = '▲ +${pct.toStringAsFixed(1)}% vs ${_namaBulanSingkat[prevM - 1]}';
+                          compStr = '▲ +${pct.toStringAsFixed(1)}% dari ${_namaBulanSingkat[prevM - 1]}';
                           isPos = true;
                         } else {
-                          compStr = '▼ -${pct.abs().toStringAsFixed(1)}% vs ${_namaBulanSingkat[prevM - 1]}';
+                          compStr = '▼ -${pct.abs().toStringAsFixed(1)}% dari ${_namaBulanSingkat[prevM - 1]}';
                           isPos = false;
                         }
                       } else if (m == startMonth) {
-                        compStr = 'Basis Awal';
+                        compStr = 'Bulan Awal';
                         isPos = null;
                       }
 
@@ -216,8 +222,8 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
                           comparison: compStr,
                           isPositive: isPos,
                           isHighlight: isHighlight,
-                          servisText: 'Servis: ${formatRupiah(sTot)} ($sPct%)',
-                          partText: 'Part: ${formatRupiah(pTot)} ($pPct%)',
+                          servisText: 'Jasa Servis: ${formatRupiah(sTot)} ($sPct%)',
+                          partText: 'Sparepart: ${formatRupiah(pTot)} ($pPct%)',
                           servisRatio: sRatio.clamp(0.05, 0.95),
                         ),
                       );
@@ -227,66 +233,66 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
                     _buildMonthCard(
                       month: 'September $selectedYearInt',
                       omzet: 'Rp 2.750.000',
-                      comparison: '▲ +7.8% vs Agu',
+                      comparison: '▲ +7.8% dari Agu',
                       isPositive: true,
                       isHighlight: true,
-                      servisText: 'Servis: Rp 1.240.000 (45%)',
-                      partText: 'Part: Rp 1.510.000 (55%)',
+                      servisText: 'Jasa Servis: Rp 1.240.000 (45%)',
+                      partText: 'Sparepart: Rp 1.510.000 (55%)',
                       servisRatio: 0.45,
                     ),
                     const SizedBox(height: 10),
                     _buildMonthCard(
                       month: 'Agustus $selectedYearInt',
                       omzet: 'Rp 2.550.000',
-                      comparison: '▲ +5.4% vs Jul',
+                      comparison: '▲ +5.4% dari Jul',
                       isPositive: true,
                       isHighlight: false,
-                      servisText: 'Servis: Rp 1.150.000 (45%)',
-                      partText: 'Part: Rp 1.400.000 (55%)',
+                      servisText: 'Jasa Servis: Rp 1.150.000 (45%)',
+                      partText: 'Sparepart: Rp 1.400.000 (55%)',
                       servisRatio: 0.45,
                     ),
                     const SizedBox(height: 10),
                     _buildMonthCard(
                       month: 'Juli $selectedYearInt',
                       omzet: 'Rp 2.420.000',
-                      comparison: '▼ -6.9% vs Jun',
+                      comparison: '▼ -6.9% dari Jun',
                       isPositive: false,
                       isHighlight: false,
-                      servisText: 'Servis: Rp 1.090.000 (45%)',
-                      partText: 'Part: Rp 1.330.000 (55%)',
+                      servisText: 'Jasa Servis: Rp 1.090.000 (45%)',
+                      partText: 'Sparepart: Rp 1.330.000 (55%)',
                       servisRatio: 0.45,
                     ),
                     const SizedBox(height: 10),
                     _buildMonthCard(
                       month: 'Juni $selectedYearInt',
                       omzet: 'Rp 2.600.000',
-                      comparison: '▲ +4.8% vs Mei',
+                      comparison: '▲ +4.8% dari Mei',
                       isPositive: true,
                       isHighlight: false,
-                      servisText: 'Servis: Rp 1.170.000 (45%)',
-                      partText: 'Part: Rp 1.430.000 (55%)',
+                      servisText: 'Jasa Servis: Rp 1.170.000 (45%)',
+                      partText: 'Sparepart: Rp 1.430.000 (55%)',
                       servisRatio: 0.45,
                     ),
                     const SizedBox(height: 10),
                     _buildMonthCard(
                       month: 'Mei $selectedYearInt',
                       omzet: 'Rp 2.480.000',
-                      comparison: '▲ +5.5% vs Apr',
+                      comparison: '▲ +5.5% dari Apr',
                       isPositive: true,
                       isHighlight: false,
-                      servisText: 'Servis: Rp 1.120.000 (45%)',
-                      partText: 'Part: Rp 1.360.000 (55%)',
+                      servisText: 'Jasa Servis: Rp 1.120.000 (45%)',
+                      partText: 'Sparepart: Rp 1.360.000 (55%)',
                       servisRatio: 0.45,
                     ),
                     const SizedBox(height: 10),
                     _buildMonthCard(
                       month: 'April $selectedYearInt',
                       omzet: 'Rp 2.350.000',
-                      comparison: 'Basis Awal',
+                      comparison: 'Bulan Awal',
                       isPositive: null,
                       isHighlight: false,
-                      servisText: 'Servis: Rp 1.060.000 (45%)',
-                      partText: 'Part: Rp 1.290.000 (55%)',
+                      servisText: 'Jasa Servis: Rp 1.060.000 (45%)',
+                      partText: 'Sparepart: Rp 1.290.000 (55%)',
                       servisRatio: 0.45,
                     ),
                   ],
@@ -321,7 +327,7 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Rincian Omzet 6 Bulan',
+                'Rincian Pemasukan 6 Bulan',
                 style: TextStyle(
                   color: textWhite,
                   fontSize: 16,
@@ -391,7 +397,7 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'TOTAL AKUMULASI OMZET (6 BULAN)',
+                'TOTAL PEMASUKAN (6 BULAN)',
                 style: TextStyle(
                   color: textMuted,
                   fontSize: 9.5,
@@ -410,7 +416,7 @@ class _RincianOmzet6BulanPageState extends State<RincianOmzet6BulanPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Rata-rata: ${formatRupiah(rataRata)} / bln',
+                'Rata-rata per bulan: ${formatRupiah(rataRata)}',
                 style: const TextStyle(
                   color: accentGreen,
                   fontSize: 9.5,
